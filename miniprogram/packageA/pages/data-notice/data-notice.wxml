@@ -1,0 +1,40 @@
+<!-- 反馈模式 -->
+<view wx:if="{{mode === 'feedback'}}" class="container">
+  <view class="card">
+    <view class="card-title">问题类型</view>
+    <view class="type-list">
+      <view
+        class="type-chip {{typeIndex === idx ? 'on' : ''}}"
+        wx:for="{{feedbackTypes}}"
+        wx:for-index="idx"
+        wx:key="key"
+        data-idx="{{idx}}"
+        bindtap="onTypeTap"
+      >{{item.label}}</view>
+    </view>
+    <textarea class="fb-content" placeholder="补充说明（选填），例如：实际下单页到手价是多少" bindinput="onContentInput" maxlength="500" />
+    <button class="btn-primary" bindtap="onSubmit">提交反馈</button>
+  </view>
+  <view class="muted tip">你的反馈是我们数据质量飞轮的一部分，感谢帮助更多人少踩坑。</view>
+</view>
+
+<!-- 数据说明模式 -->
+<view wx:else class="container notice">
+  <view class="card">
+    <view class="card-title">数据来源</view>
+    <text class="p">商品、价格、券与补贴信息均来自京东联盟、多多进宝等平台官方开放接口。我们不爬取页面、不抓取 Cookie、不模拟登录、不绕过任何风控。</text>
+  </view>
+  <view class="card">
+    <view class="card-title">价格口径</view>
+    <text class="p">「参考到手价」由规则引擎根据公开可领券与补贴估算，包含：平台券、店铺券、跨店满减、平台/官方补贴，以及你在省钱资产库自申报的会员价/国补。</text>
+    <text class="p">暂未纳入：个人随机红包、支付渠道优惠、直播间专属价、新客专享价、以旧换新（实际可能更低）。</text>
+  </view>
+  <view class="card">
+    <view class="card-title">免责声明</view>
+    <text class="p">价格为公开优惠与平台返回数据估算，最终以下单页为准。我们不承诺"全网绝对最低价"，仅提供"已知可领券与公开补贴后的最优价"。</text>
+  </view>
+  <view class="card">
+    <view class="card-title">返佣披露</view>
+    <text class="p">本产品通过官方联盟获取 CPS 返佣，返佣不影响任何推荐排序。我们敢于输出"不建议买"。</text>
+  </view>
+</view>

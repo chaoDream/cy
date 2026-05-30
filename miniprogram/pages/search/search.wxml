@@ -1,0 +1,55 @@
+<view class="container">
+  <!-- 剪贴板提示 -->
+  <view class="clip-hint" wx:if="{{clipboardHint}}">
+    <text class="clip-text">检测到商品链接，是否查价？</text>
+    <view class="clip-actions">
+      <text class="clip-btn" bindtap="useClipboard">立即查价</text>
+      <text class="clip-close" bindtap="dismissClipboard">×</text>
+    </view>
+  </view>
+
+  <!-- 输入区 -->
+  <view class="card">
+    <textarea
+      class="link-input"
+      placeholder="粘贴京东 / 拼多多手机商品链接或分享文本"
+      value="{{linkText}}"
+      bindinput="onInput"
+      maxlength="2000"
+      auto-height
+    />
+    <button class="btn-primary parse-btn" bindtap="onParse">算真实到手价</button>
+    <view class="search-line">
+      <input class="search-input" placeholder="或搜索机型，如 iPhone 16 Pro" bindinput="onSearchInput" bindconfirm="onSearch" />
+      <text class="search-go" bindtap="onSearch">搜索</text>
+    </view>
+  </view>
+
+  <!-- 省钱资产库 -->
+  <asset-library assets="{{assets}}" bind:change="onAssetsChange" />
+
+  <!-- 搜索结果 -->
+  <view wx:if="{{searchResults.length}}" class="section">
+    <view class="section-title">搜索结果</view>
+    <product-card wx:for="{{searchResults}}" wx:key="itemId" item="{{item}}" bind:tap="onCardTap" />
+  </view>
+
+  <!-- 今日脱水爆款（占位，运营维护） -->
+  <view class="section">
+    <view class="section-title">最近查询</view>
+    <view wx:if="{{recent.length}}" class="recent-list">
+      <view
+        class="recent-item"
+        wx:for="{{recent}}"
+        wx:key="itemId"
+        data-platform="{{item.platform}}"
+        data-itemid="{{item.itemId}}"
+        bindtap="onRecentTap"
+      >
+        <image class="recent-img" src="{{item.imageUrl}}" mode="aspectFill" />
+        <text class="recent-title">{{item.title}}</text>
+      </view>
+    </view>
+    <view wx:else class="empty">还没有查询记录，粘贴一个链接试试吧</view>
+  </view>
+</view>

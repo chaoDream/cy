@@ -1,0 +1,101 @@
+.page {
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+.loading, .error-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  color: #8a9099;
+  gap: 24rpx;
+}
+.card {
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 28rpx;
+  margin-bottom: 24rpx;
+}
+.card-plain { margin-bottom: 24rpx; }
+.card-title { font-size: 30rpx; font-weight: 600; margin-bottom: 16rpx; display: block; }
+.muted { color: #8a9099; font-size: 24rpx; }
+.price { color: #fa3534; font-weight: 700; }
+.price-big { color: #fa3534; font-weight: 700; font-size: 56rpx; }
+
+.prod { display: flex; }
+.prod-img {
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 14rpx;
+  background: #f2f3f5;
+  flex-shrink: 0;
+}
+.prod-info { flex: 1; margin-left: 20rpx; }
+.prod-title {
+  font-size: 28rpx;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.prod-meta { display: flex; gap: 12rpx; margin: 10rpx 0; }
+.tag {
+  background: #eef3fe;
+  color: #1a73e8;
+  font-size: 22rpx;
+  padding: 2rpx 14rpx;
+  border-radius: 6rpx;
+}
+.prod-shop { display: block; }
+.sku-conf { font-size: 22rpx; color: #6b7280; margin-top: 10rpx; }
+.conf { margin-left: 10rpx; padding: 2rpx 10rpx; border-radius: 6rpx; font-size: 20rpx; }
+.conf-high { background: #e8f8ee; color: #34c759; }
+.conf-mid { background: #fff7e6; color: #f08c00; }
+.conf-low { background: #fff4f0; color: #e8590c; }
+.need-confirm { color: #e8590c; font-size: 22rpx; margin-top: 8rpx; }
+
+.price-card .price-row { display: flex; align-items: baseline; gap: 20rpx; }
+.price-origin { color: #b0b4ba; font-size: 24rpx; text-decoration: line-through; }
+
+.cross-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18rpx 0;
+  border-bottom: 2rpx solid #f2f3f5;
+}
+.cross-item:last-child { border-bottom: none; }
+.cross-left { display: flex; align-items: center; gap: 12rpx; }
+
+.compliance {
+  padding: 0 8rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+.compliance text { color: #b0b4ba; font-size: 22rpx; line-height: 1.6; }
+.link { color: #1a73e8; font-size: 24rpx; }
+.bottom-space { height: 160rpx; }
+
+.action-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom));
+  box-shadow: 0 -2rpx 16rpx rgba(0, 0, 0, 0.06);
+  gap: 20rpx;
+}
+.action-sub {
+  font-size: 22rpx;
+  color: #8a9099;
+  text-align: center;
+  width: 120rpx;
+}
+.action-watch { flex: 1; }
+.action-buy { flex: 1.4; }

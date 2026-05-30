@@ -1,0 +1,40 @@
+<view class="container">
+  <view wx:if="{{needLogin}}" class="login-box">
+    <text class="muted">登录后即可盯价、收降价提醒</text>
+    <button class="btn-primary" bindtap="onLogin">微信一键登录</button>
+  </view>
+
+  <view wx:elif="{{loading}}" class="empty">加载中…</view>
+
+  <view wx:elif="{{!list.length}}" class="empty">还没有盯价商品，去查价页加一个吧</view>
+
+  <block wx:else>
+    <view class="watch-card" wx:for="{{list}}" wx:key="watchId">
+      <view
+        class="wc-top"
+        data-platform="{{item.platform}}"
+        data-itemid="{{item.platformItemId}}"
+        bindtap="onTapItem"
+      >
+        <image class="wc-img" src="{{item.imageUrl}}" mode="aspectFill" />
+        <view class="wc-info">
+          <text class="wc-title">{{item.title}}</text>
+          <view class="wc-prices">
+            <text>当前到手价 <text class="price">¥{{item.currentPrice || '--'}}</text></text>
+            <text>目标价 <text class="target">¥{{item.targetPrice}}</text></text>
+          </view>
+          <text class="wc-status status-{{item.status}}">
+            {{item.status === 'hit' ? '已达目标价，请重新订阅以继续提醒' : (item.status === 'paused' ? '已暂停' : '盯价中')}}
+          </text>
+        </view>
+      </view>
+      <view class="wc-actions">
+        <text class="wc-act" data-watchid="{{item.watchId}}" data-current="{{item.targetPrice}}" bindtap="onEditTarget">改目标价</text>
+        <text class="wc-act" data-watchid="{{item.watchId}}" data-enabled="{{item.notifyEnabled}}" bindtap="onToggleNotify">
+          {{item.notifyEnabled ? '关提醒' : '开提醒'}}
+        </text>
+        <text class="wc-act danger" data-watchid="{{item.watchId}}" bindtap="onRemove">取消</text>
+      </view>
+    </view>
+  </block>
+</view>

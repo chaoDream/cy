@@ -1,0 +1,23 @@
+<view class="pw" wx:if="{{price}}">
+  <view class="pw-head" bindtap="toggle">
+    <text class="card-title">价格脱水路径</text>
+    <text class="pw-toggle">{{expanded ? '收起' : '展开明细'}}</text>
+  </view>
+
+  <view class="pw-steps {{expanded ? '' : 'collapsed'}}">
+    <view class="pw-step {{item.type}}" wx:for="{{steps}}" wx:key="index">
+      <text class="pw-name">{{item.name}}</text>
+      <text class="pw-amount">{{item.amount}}</text>
+    </view>
+  </view>
+
+  <view class="pw-not" wx:if="{{expanded}}">
+    <text class="muted">未纳入（可能更低）：{{price.notIncluded}}</text>
+  </view>
+
+  <view class="pw-uncertain" wx:if="{{price.uncertaintyFlags.length}}">
+    <text class="muted" wx:for="{{price.uncertaintyFlags}}" wx:key="index">※ {{item}}</text>
+  </view>
+
+  <view class="disclaimer">{{price.disclaimer}}</view>
+</view>

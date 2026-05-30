@@ -1,0 +1,17 @@
+<view class="pc" bindtap="onTap">
+  <image class="pc-img" src="{{item.imageUrl}}" mode="aspectFill" lazy-load />
+  <view class="pc-body">
+    <text class="pc-title">{{item.title || item.standardName}}</text>
+    <view class="pc-meta">
+      <text class="pc-platform">{{platformText}}</text>
+      <text class="pc-shop" wx:if="{{item.shopName}}">{{item.shopName}}</text>
+    </view>
+    <view class="pc-tags" wx:if="{{item.riskTags.length}}">
+      <text class="pc-risk" wx:for="{{item.riskTags}}" wx:key="*this">{{item}}</text>
+    </view>
+    <view class="pc-price">
+      <text class="muted">参考到手价</text>
+      <text class="price-big">¥{{item.bestFinalPrice || item.estimatedFinalPrice || item.rawPrice}}</text>
+    </view>
+  </view>
+</view>

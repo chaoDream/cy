@@ -1,0 +1,14 @@
+<view class="asset-lib">
+  <view class="al-title">
+    <text>省钱资产库</text>
+    <text class="al-sub">勾选你的会员身份，算出个人专属到手价</text>
+  </view>
+  <view class="al-tags">
+    <view class="al-tag {{assets.vip88 ? 'on' : ''}}" data-key="vip88" bindtap="onToggle">88VIP</view>
+    <view class="al-tag {{assets.jdPlus ? 'on' : ''}}" data-key="jdPlus" bindtap="onToggle">京东PLUS</view>
+    <view class="al-tag {{assets.pddMonthly ? 'on' : ''}}" data-key="pddMonthly" bindtap="onToggle">省钱月卡</view>
+    <picker class="al-tag {{assets.govSubsidyRegion ? 'on' : ''}}" range="{{provinces}}" value="{{regionIndex}}" bindchange="onRegionChange">
+      <text>{{assets.govSubsidyRegion || '国补地区'}}</text>
+    </picker>
+  </view>
+</view>

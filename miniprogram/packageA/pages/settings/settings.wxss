@@ -1,0 +1,14 @@
+.card-title { font-size: 30rpx; font-weight: 600; margin-bottom: 16rpx; }
+.opt {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  padding: 24rpx;
+  border-radius: 14rpx;
+  border: 2rpx solid #eef0f2;
+  margin-bottom: 16rpx;
+}
+.opt.on { border-color: #1a73e8; background: #f5f9ff; }
+.opt text:first-child { font-size: 28rpx; }
+.muted { color: #8a9099; font-size: 24rpx; }
+.note { display: block; margin-bottom: 20rpx; line-height: 1.6; }

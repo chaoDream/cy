@@ -1,0 +1,17 @@
+.rt {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14rpx;
+}
+.rt-tag {
+  background: #fff4f0;
+  color: #e8590c;
+  border: 2rpx solid #ffd8c2;
+  border-radius: 10rpx;
+  padding: 10rpx 18rpx;
+  font-size: 24rpx;
+}
+.rt-safe {
+  color: #34c759;
+  font-size: 26rpx;
+}

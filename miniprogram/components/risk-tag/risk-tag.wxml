@@ -1,0 +1,6 @@
+<view class="rt" wx:if="{{tags.length}}">
+  <view class="rt-tag" wx:for="{{tags}}" wx:key="index">⚠️ {{item}}</view>
+</view>
+<view class="rt-safe" wx:else>
+  <text>✓ 未发现明显风险（仍以下单页为准）</text>
+</view>

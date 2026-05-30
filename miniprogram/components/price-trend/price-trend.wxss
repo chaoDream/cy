@@ -1,0 +1,59 @@
+.pt {
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 28rpx;
+}
+.pt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-title { font-size: 30rpx; font-weight: 600; }
+.pt-lows {
+  display: flex;
+  gap: 20rpx;
+  font-size: 24rpx;
+  color: #6b7280;
+}
+.pt-empty {
+  color: #b0b4ba;
+  font-size: 26rpx;
+  padding: 40rpx 0;
+  text-align: center;
+}
+.pt-chart {
+  display: flex;
+  align-items: flex-end;
+  height: 240rpx;
+  margin-top: 24rpx;
+  gap: 8rpx;
+}
+.pt-bar-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+}
+.pt-bar {
+  width: 60%;
+  background: linear-gradient(180deg, #4d8df6, #1a73e8);
+  border-radius: 8rpx 8rpx 0 0;
+  min-height: 8rpx;
+}
+.pt-date {
+  font-size: 18rpx;
+  color: #b0b4ba;
+  margin-top: 8rpx;
+}
+.pt-warn {
+  margin-top: 16rpx;
+  color: #e8590c;
+  font-size: 26rpx;
+}
+.pt-good {
+  margin-top: 16rpx;
+  color: #34c759;
+  font-size: 26rpx;
+}

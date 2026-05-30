@@ -1,0 +1,23 @@
+<view class="container">
+  <view class="card">
+    <view class="card-title">默认目标价规则</view>
+    <view class="opt {{defaultRule === 'auto' ? 'on' : ''}}" data-rule="auto" bindtap="onRuleChange">
+      <text>智能推荐（推荐）</text>
+      <text class="muted">有 30 天低价取低价；接近低价再降 3%；数据不足再降 5%</text>
+    </view>
+    <view class="opt {{defaultRule === 'low30' ? 'on' : ''}}" data-rule="low30" bindtap="onRuleChange">
+      <text>近 30 天低价</text>
+      <text class="muted">以最近 30 天出现过的最低到手价为目标</text>
+    </view>
+    <view class="opt {{defaultRule === 'custom' ? 'on' : ''}}" data-rule="custom" bindtap="onRuleChange">
+      <text>每次手动输入</text>
+      <text class="muted">加入盯价时自己填目标价</text>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">降价提醒</view>
+    <text class="muted note">微信订阅消息为「一次订阅一次下发」，收到一次提醒后需再次授权才能继续接收。</text>
+    <button class="btn-primary" bindtap="onResubscribe">重新开启降价提醒</button>
+  </view>
+</view>

@@ -1,0 +1,83 @@
+<view wx:if="{{loading}}" class="loading">正在为你算真实到手价…</view>
+
+<view wx:elif="{{error}}" class="error-box">
+  <text>{{error}}</text>
+  <button class="btn-ghost" bindtap="_load">重试</button>
+</view>
+
+<scroll-view wx:else scroll-y class="page" style="height: 100vh;">
+  <!-- 1. 商品基础信息 -->
+  <view class="card prod">
+    <image class="prod-img" src="{{data.productInfo.imageUrl}}" mode="aspectFill" />
+    <view class="prod-info">
+      <text class="prod-title">{{data.productInfo.title}}</text>
+      <view class="prod-meta">
+        <text class="tag">{{platformText}}</text>
+        <text class="tag" wx:if="{{shopTypeText}}">{{shopTypeText}}</text>
+      </view>
+      <text class="prod-shop muted">{{data.productInfo.shopName}}</text>
+      <view class="sku-conf">
+        标准型号：{{data.skuInfo.standardName}}
+        <text class="conf conf-{{data.skuInfo.confidence}}">置信度{{data.skuInfo.confidence}}</text>
+      </view>
+      <view wx:if="{{data.skuInfo.needConfirm}}" class="need-confirm">疑似同款，需谨慎比较</view>
+    </view>
+  </view>
+
+  <!-- 2. AI 购买结论 -->
+  <view class="card-plain">
+    <ai-conclusion rec="{{data.aiRecommendation}}" />
+  </view>
+
+  <!-- 3. 当前参考到手价 -->
+  <view class="card price-card">
+    <text class="card-title">当前参考到手价</text>
+    <view class="price-row">
+      <text class="price-big">¥{{data.priceInfo.estimatedFinalPrice}}</text>
+      <text class="price-origin">展示价 ¥{{data.priceInfo.displayPrice}}</text>
+    </view>
+  </view>
+
+  <!-- 4. 价格脱水路径（瀑布流） -->
+  <view class="card-plain">
+    <price-waterfall price="{{data.priceInfo}}" bind:expand="onPriceExpand" />
+  </view>
+
+  <!-- 5. 风险提示 -->
+  <view class="card" bindtap="onRiskView">
+    <text class="card-title">风险提示</text>
+    <risk-tag tags="{{data.riskInfo}}" />
+  </view>
+
+  <!-- 6. 历史价格 -->
+  <view class="card-plain">
+    <price-trend trend="{{data.trendInfo}}" />
+  </view>
+
+  <!-- 7. 同款对比 -->
+  <view class="card" wx:if="{{crossView.length}}">
+    <text class="card-title">跨平台同款对比</text>
+    <view class="cross-item" wx:for="{{crossView}}" wx:key="itemId">
+      <view class="cross-left">
+        <text class="tag">{{item.platformText}}</text>
+        <text class="muted">{{item.shopTypeText}}</text>
+      </view>
+      <text class="price">¥{{item.price}}</text>
+    </view>
+  </view>
+
+  <!-- 合规说明 -->
+  <view class="compliance">
+    <text>{{data.priceInfo.disclaimer}}</text>
+    <navigator url="/packageA/pages/data-notice/data-notice" class="link">数据来源与免责说明 ›</navigator>
+  </view>
+
+  <view class="bottom-space"></view>
+</scroll-view>
+
+<!-- 8. 操作区 -->
+<view wx:if="{{data}}" class="action-bar">
+  <view class="action-sub" bindtap="onFeedback">反馈错误</view>
+  <button class="btn-ghost action-watch" bindtap="onWatch">盯价</button>
+  <button class="btn-primary action-buy" bindtap="onBuy">去购买</button>
+</view>

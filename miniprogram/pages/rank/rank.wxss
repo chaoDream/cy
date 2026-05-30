@@ -1,0 +1,45 @@
+.brand-bar {
+  white-space: nowrap;
+  margin-bottom: 20rpx;
+}
+.brand-chip {
+  display: inline-block;
+  padding: 12rpx 28rpx;
+  background: #fff;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  color: #6b7280;
+  margin-right: 16rpx;
+}
+.brand-chip.on {
+  background: #1a73e8;
+  color: #fff;
+}
+.rank-row {
+  position: relative;
+}
+.rank-no {
+  position: absolute;
+  left: 8rpx;
+  top: 8rpx;
+  z-index: 2;
+  width: 40rpx;
+  height: 40rpx;
+  line-height: 40rpx;
+  text-align: center;
+  border-radius: 10rpx 0 16rpx 0;
+  background: #c7ccd1;
+  color: #fff;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+.rank-no-0 { background: #fa3534; }
+.rank-no-1 { background: #ff9f0a; }
+.rank-no-2 { background: #fbbf24; }
+.disclaimer {
+  color: #b0b4ba;
+  font-size: 22rpx;
+  text-align: center;
+  margin-top: 10rpx;
+}
+.empty { text-align: center; color: #b0b4ba; padding: 80rpx 0; }

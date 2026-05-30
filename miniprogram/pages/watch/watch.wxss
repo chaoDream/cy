@@ -1,0 +1,58 @@
+.login-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 30rpx;
+  padding: 120rpx 40rpx;
+}
+.login-box button { width: 80%; }
+.empty { text-align: center; color: #b0b4ba; padding: 100rpx 0; }
+.muted { color: #8a9099; font-size: 26rpx; }
+.price { color: #fa3534; font-weight: 700; }
+.target { color: #1a73e8; font-weight: 700; }
+
+.watch-card {
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+}
+.wc-top { display: flex; }
+.wc-img {
+  width: 150rpx;
+  height: 150rpx;
+  border-radius: 14rpx;
+  background: #f2f3f5;
+  flex-shrink: 0;
+}
+.wc-info { flex: 1; margin-left: 20rpx; display: flex; flex-direction: column; }
+.wc-title {
+  font-size: 28rpx;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.wc-prices {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #6b7280;
+}
+.wc-status { font-size: 22rpx; margin-top: 10rpx; }
+.status-watching { color: #34c759; }
+.status-hit { color: #fa3534; }
+.status-paused { color: #b0b4ba; }
+
+.wc-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 30rpx;
+  margin-top: 18rpx;
+  padding-top: 18rpx;
+  border-top: 2rpx solid #f2f3f5;
+}
+.wc-act { color: #1a73e8; font-size: 26rpx; }
+.wc-act.danger { color: #fa3534; }

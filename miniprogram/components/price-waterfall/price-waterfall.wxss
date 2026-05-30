@@ -1,0 +1,60 @@
+.pw {
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 28rpx;
+}
+.pw-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-title {
+  font-size: 30rpx;
+  font-weight: 600;
+}
+.pw-toggle {
+  color: #1a73e8;
+  font-size: 26rpx;
+}
+.pw-steps {
+  margin-top: 16rpx;
+  overflow: hidden;
+}
+.pw-steps.collapsed .pw-step:not(.base):not(.final) {
+  display: none;
+}
+.pw-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14rpx 0;
+  border-bottom: 2rpx dashed #eef0f2;
+  font-size: 28rpx;
+}
+.pw-step.minus .pw-amount { color: #34c759; }
+.pw-step.plus .pw-amount { color: #ff9f0a; }
+.pw-step.final {
+  border-bottom: none;
+  padding-top: 18rpx;
+}
+.pw-step.final .pw-name { font-weight: 700; }
+.pw-step.final .pw-amount {
+  color: #fa3534;
+  font-weight: 700;
+  font-size: 40rpx;
+}
+.pw-not {
+  margin-top: 12rpx;
+}
+.pw-uncertain {
+  display: flex;
+  flex-direction: column;
+  margin-top: 10rpx;
+  gap: 4rpx;
+}
+.disclaimer {
+  color: #b0b4ba;
+  font-size: 22rpx;
+  line-height: 1.6;
+  margin-top: 16rpx;
+}

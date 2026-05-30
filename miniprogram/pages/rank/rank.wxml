@@ -1,0 +1,24 @@
+<view class="container">
+  <scroll-view scroll-x class="brand-bar">
+    <view
+      class="brand-chip {{brandIndex === idx ? 'on' : ''}}"
+      wx:for="{{brands}}"
+      wx:for-index="idx"
+      wx:key="*this"
+      data-idx="{{idx}}"
+      bindtap="onBrandTap"
+    >{{item}}</view>
+  </scroll-view>
+
+  <view wx:if="{{loading}}" class="empty">加载中…</view>
+  <view wx:elif="{{!list.length}}" class="empty">榜单数据积累中，先去查几个机型吧</view>
+
+  <block wx:else>
+    <view class="rank-row" wx:for="{{list}}" wx:key="skuId" data-platform="{{item.platform}}">
+      <text class="rank-no rank-no-{{index}}">{{index + 1}}</text>
+      <product-card item="{{item}}" bind:tap="onCardTap" />
+    </view>
+  </block>
+
+  <view class="disclaimer">榜单为已知可领券与公开补贴后的最优价，非全网绝对最低价。</view>
+</view>

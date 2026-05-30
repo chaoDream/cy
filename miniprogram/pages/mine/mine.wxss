@@ -1,0 +1,47 @@
+.profile {
+  display: flex;
+  align-items: center;
+}
+.avatar {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4d8df6, #1a73e8);
+  color: #fff;
+  font-size: 44rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.profile-info {
+  margin-left: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+.name { font-size: 32rpx; font-weight: 600; }
+.muted { color: #8a9099; font-size: 24rpx; }
+.mini { width: 260rpx; font-size: 26rpx; }
+.block-title {
+  font-size: 26rpx;
+  color: #8a9099;
+  margin: 24rpx 8rpx 12rpx;
+}
+.menu { margin-top: 24rpx; padding: 0 28rpx; }
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 30rpx 0;
+  border-bottom: 2rpx solid #f2f3f5;
+  font-size: 28rpx;
+}
+.menu-item:last-child { border-bottom: none; }
+.arrow { color: #c7ccd1; font-size: 36rpx; }
+.cps-note {
+  color: #b0b4ba;
+  font-size: 22rpx;
+  line-height: 1.7;
+  padding: 24rpx 16rpx;
+}

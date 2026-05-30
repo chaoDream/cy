@@ -1,0 +1,13 @@
+<view class="ai-card {{themeMap[rec.conclusion]}}" wx:if="{{rec}}">
+  <view class="ai-head">
+    <text class="ai-label">{{rec.conclusionLabel}}</text>
+    <text class="ai-conf">AI 置信度 {{rec.confidence}}</text>
+  </view>
+  <view class="ai-reasons">
+    <view class="ai-reason" wx:for="{{rec.reasons}}" wx:key="index">
+      <text class="dot">·</text><text>{{item}}</text>
+    </view>
+  </view>
+  <view class="ai-risk" wx:if="{{rec.riskHint}}">{{rec.riskHint}}</view>
+  <view class="ai-foot">AI 仅基于公开价格事实给出解释，不代表投资/购买承诺</view>
+</view>

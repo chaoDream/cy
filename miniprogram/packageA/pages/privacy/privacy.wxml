@@ -1,0 +1,18 @@
+<view class="container">
+  <view class="card">
+    <view class="card-title">我们收集什么</view>
+    <text class="p">为提供查价、盯价与降价提醒，我们会收集：微信 openid（用于登录与提醒触达）、你自申报的省钱资产（会员身份/国补地区）、你查询与盯价的商品。</text>
+  </view>
+  <view class="card">
+    <view class="card-title">我们不做什么</view>
+    <text class="p">我们不会获取你的电商平台账号、密码或 Cookie，不会模拟登录你的账号，不会读取你的订单与支付信息。</text>
+  </view>
+  <view class="card">
+    <view class="card-title">信息如何使用</view>
+    <text class="p">省钱资产仅用于本地与服务端计算个人专属到手价；openid 仅用于登录与降价订阅消息下发。</text>
+  </view>
+  <view class="card">
+    <button class="btn-ghost" bindtap="openOfficialPrivacy">查看完整《隐私保护指引》</button>
+  </view>
+  <text class="muted foot">完整《用户协议》《隐私政策》以小程序后台备案版本为准。</text>
+</view>

@@ -1,0 +1,69 @@
+spring:
+  application:
+    name: zdsj-backend
+  profiles:
+    active: dev
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/zdsj}
+    username: ${DB_USER:zdsj}
+    password: ${DB_PASSWORD:zdsj_dev_pwd}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          time_zone: Asia/Shanghai
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  quartz:
+    job-store-type: memory
+
+server:
+  port: 8080
+
+# 业务配置
+zdsj:
+  jwt:
+    secret: ${JWT_SECRET:zdsj_dev_secret_please_change_in_prod_at_least_32_bytes}
+    ttl-seconds: 604800        # 7 天
+  wechat:
+    appid: ${WX_APPID:wx_dev_appid}
+    secret: ${WX_SECRET:wx_dev_secret}
+    # 微信订阅消息模板（降价提醒）
+    subscribe-template-id: ${WX_SUB_TEMPLATE:dev_template_id}
+  affiliate:
+    # 联盟 API：未配置时走 mock 适配器（本地可跑通闭环）
+    mock: ${AFFILIATE_MOCK:true}
+    pdd:
+      client-id: ${PDD_CLIENT_ID:}
+      client-secret: ${PDD_CLIENT_SECRET:}
+      pid: ${PDD_PID:}
+    jd:
+      app-key: ${JD_APP_KEY:}
+      app-secret: ${JD_APP_SECRET:}
+      union-id: ${JD_UNION_ID:}
+  ai:
+    # 大模型：未配置 api-key 时走 mock（基于规则的确定性结论）
+    mock: ${AI_MOCK:true}
+    base-url: ${AI_BASE_URL:https://api.openai.com/v1}
+    api-key: ${AI_API_KEY:}
+    model-high: ${AI_MODEL_HIGH:gpt-4o}
+    model-fast: ${AI_MODEL_FAST:gpt-4o-mini}
+  watch:
+    # 漏斗轮询频率（cron）
+    poll-hot-cron: "0 0 */2 * * ?"     # 热门 SKU 每 2h
+    poll-user-cron: "0 30 */4 * * ?"   # 用户关注 每 4h
+    poll-normal-cron: "0 0 4 * * ?"    # 普通 每天 04:00
+
+logging:
+  level:
+    com.zdsj: INFO

@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "手机低价榜",
+  "usingComponents": {
+    "product-card": "/components/product-card/product-card"
+  },
+  "enablePullDownRefresh": true
+}

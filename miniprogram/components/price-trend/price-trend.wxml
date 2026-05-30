@@ -1,0 +1,21 @@
+<view class="pt">
+  <view class="pt-head">
+    <text class="card-title">历史价格</text>
+    <view class="pt-lows">
+      <text>30天低 <text class="price">¥{{low30}}</text></text>
+      <text>90天低 <text class="price">¥{{low90}}</text></text>
+    </view>
+  </view>
+
+  <view wx:if="{{trend.historyInsufficient}}" class="pt-empty">历史价格积累中，已为你从今天开始记录</view>
+
+  <view wx:else class="pt-chart">
+    <view class="pt-bar-wrap" wx:for="{{bars}}" wx:key="index">
+      <view class="pt-bar" style="height: {{item.height}}%"></view>
+      <text class="pt-date">{{item.date}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{trend.fakeDiscount}}" class="pt-warn">{{trend.note}}</view>
+  <view wx:elif="{{trend.nearLow}}" class="pt-good">当前已接近近 30 天低价</view>
+</view>

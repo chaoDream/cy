@@ -1,0 +1,77 @@
+.clip-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff7e6;
+  border: 2rpx solid #ffe0a3;
+  border-radius: 16rpx;
+  padding: 20rpx 24rpx;
+  margin-bottom: 20rpx;
+}
+.clip-text { color: #b76e00; font-size: 26rpx; }
+.clip-actions { display: flex; align-items: center; gap: 20rpx; }
+.clip-btn { color: #1a73e8; font-size: 26rpx; font-weight: 600; }
+.clip-close { color: #b0b4ba; font-size: 36rpx; }
+
+.link-input {
+  width: 100%;
+  min-height: 140rpx;
+  background: #f7f8fa;
+  border-radius: 14rpx;
+  padding: 20rpx;
+  box-sizing: border-box;
+  font-size: 28rpx;
+}
+.parse-btn {
+  margin-top: 20rpx;
+}
+.search-line {
+  display: flex;
+  align-items: center;
+  margin-top: 20rpx;
+  background: #f7f8fa;
+  border-radius: 999rpx;
+  padding: 0 24rpx;
+}
+.search-input {
+  flex: 1;
+  height: 72rpx;
+  font-size: 26rpx;
+}
+.search-go {
+  color: #1a73e8;
+  font-size: 26rpx;
+  padding-left: 16rpx;
+}
+.section { margin-top: 24rpx; }
+.section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 16rpx;
+}
+.recent-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20rpx;
+}
+.recent-item {
+  width: 200rpx;
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 12rpx;
+}
+.recent-img {
+  width: 100%;
+  height: 176rpx;
+  border-radius: 12rpx;
+  background: #f2f3f5;
+}
+.recent-title {
+  font-size: 22rpx;
+  line-height: 1.4;
+  margin-top: 8rpx;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
