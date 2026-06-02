@@ -85,6 +85,43 @@ zdsj:
 
 若商品查询接口返回 403，需在[京东联盟开放平台](https://union.jd.com/openplatform)申请对应 API 权限。
 
+## 拼多多多多进宝（真实 API）
+
+密钥同样放在 `backend/application-local.yml`：
+
+```yaml
+zdsj:
+  affiliate:
+    mock: false
+    pdd:
+      client-id: YOUR_PDD_CLIENT_ID
+      client-secret: YOUR_PDD_CLIENT_SECRET
+      pid: YOUR_PDD_PID   # 推广位 ID，转链必填
+```
+
+环境变量：`PDD_CLIENT_ID`、`PDD_CLIENT_SECRET`、`PDD_PID`。
+
+**开通步骤（简要）：**
+
+1. 在 [拼多多开放平台](https://open.pinduoduo.com) 注册开发者，创建应用，获取 `client_id` / `client_secret`
+2. 在 [多多进宝](https://jinbao.pinduoduo.com) 绑定该 `client_id`（应用管理 → 绑定多多客）
+3. 在多多进宝创建推广位，得到 `pid`（形如 `123456_789012345`）
+4. 确认已开通「多多客 API」权限包（商品搜索、详情、转链）
+
+| 接口 | 用途 |
+|---|---|
+| `pdd.ddk.goods.search` | 关键词/商品链接搜索，解析分享链 |
+| `pdd.ddk.goods.detail` | 按 goodsSign 查详情 |
+| `pdd.ddk.goods.promotion.url.generate` | 生成 CPS 推广链接（需 pid） |
+
+解析成功后 `itemId` 为平台返回的 **goodsSign**（加密 goodsId），不再使用 `pdd_ps_` 占位 id。
+
+```bash
+curl -X POST http://localhost:8080/api/link/parse \
+  -H 'content-type: application/json' \
+  -d '{"linkText":"https://mobile.yangkeduo.com/goods1.html?ps=FuXUG9Y3SE"}'
+```
+
 ## 本地联调（mock 全开）
 
 ```bash

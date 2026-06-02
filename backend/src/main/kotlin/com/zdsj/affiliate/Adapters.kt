@@ -2,6 +2,8 @@ package com.zdsj.affiliate
 
 import com.zdsj.affiliate.jd.JdUnionClient
 import com.zdsj.affiliate.jd.JdUnionService
+import com.zdsj.affiliate.pdd.PddDdkClient
+import com.zdsj.affiliate.pdd.PddDdkService
 import com.zdsj.config.AffiliateProperties
 import org.springframework.stereotype.Component
 import java.time.Duration
@@ -59,40 +61,57 @@ class JdAdapter(
     }
 }
 
-/** 多多进宝适配器 */
+/** 多多进宝适配器（未配置真实 API 时走 mock） */
 @Component
 class PddAdapter(
     private val props: AffiliateProperties,
     private val rateLimiter: RateLimiter,
+    private val pddDdkClient: PddDdkClient,
+    private val pddDdkService: PddDdkService,
 ) : AffiliateAdapter {
 
     override fun platform() = Platform.PDD
 
-    override fun extractItemId(linkText: String): String? {
-        if (linkText.contains("pinduoduo") || linkText.contains("yangkeduo") || linkText.contains("拼多多")) {
-            return Regex("""\d{6,}""").find(linkText)?.value ?: "pdd_default"
+    override fun extractItemId(linkText: String): String? = PddLinkParser.extractItemId(linkText)
+
+    override fun fetchFromShareText(linkText: String): AffiliateItem? {
+        guardRate()
+        if (useMock()) {
+            val itemId = extractItemId(linkText) ?: return null
+            val seed = MockCatalog.byItemId(itemId)
+            val title = PddLinkParser.extractShareTitle(linkText) ?: seed.title
+            return MockCatalog.toItem(Platform.PDD, itemId, seed).copy(
+                title = title,
+                sourceUrl = PddLinkParser.extractUrl(linkText),
+            )
         }
-        return null
+        return runCatching { pddDdkService.fetchFromShareText(linkText) }
+            .getOrElse { throw it }
     }
 
     override fun fetchItem(itemId: String): AffiliateItem? {
         guardRate()
-        if (props.mock) return MockCatalog.toItem(Platform.PDD, itemId, MockCatalog.byItemId(itemId))
-        throw NotImplementedError("多多进宝真实接入待配置")
+        if (useMock()) return MockCatalog.toItem(Platform.PDD, itemId, MockCatalog.byItemId(itemId))
+        return runCatching { pddDdkService.fetchItem(itemId) }.getOrNull()
     }
 
     override fun search(keyword: String, limit: Int): List<AffiliateItem> {
         guardRate()
-        if (props.mock) {
+        if (useMock()) {
             val seed = MockCatalog.matchByKeyword(keyword) ?: return emptyList()
             return listOf(MockCatalog.toItem(Platform.PDD, "pdd_${seed.keyword}", seed))
         }
-        throw NotImplementedError("多多进宝搜索真实接入待配置")
+        return pddDdkService.search(keyword, limit)
     }
 
-    override fun buildCpsLink(itemId: String): String? =
-        if (props.mock) "https://pdd.example.com/cps/$itemId?pid=mock"
-        else null
+    override fun buildCpsLink(itemId: String): String? {
+        if (useMock()) return "https://pdd.example.com/cps/$itemId?pid=mock"
+        if (!PddLinkParser.isGoodsSign(itemId)) return null
+        return pddDdkService.buildCpsLink(itemId)
+    }
+
+    /** 未配置多多进宝密钥时继续走 mock，避免京东真实模式下拼多多直接 500 */
+    private fun useMock(): Boolean = props.mock || !pddDdkClient.isConfigured()
 
     private fun guardRate() {
         if (!rateLimiter.tryAcquire("pdd", maxPerWindow = 600, window = Duration.ofMinutes(1))) {

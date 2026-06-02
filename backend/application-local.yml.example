@@ -10,3 +10,7 @@ zdsj:
       union-id: YOUR_JD_UNION_ID
       # site-id: YOUR_JD_SITE_ID      # 可选，有站点 ID 时用 common 转链
       # position-id: YOUR_JD_PID      # 可选，推广位
+    pdd:
+      client-id: YOUR_PDD_CLIENT_ID
+      client-secret: YOUR_PDD_CLIENT_SECRET
+      pid: YOUR_PDD_PID               # 推广位，格式如 123456_789012345

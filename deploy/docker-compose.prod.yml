@@ -1,0 +1,98 @@
+# 方案 A：单机 Docker 部署（Nginx + Backend + PostgreSQL + Redis）
+# 用法：cd deploy && cp .env.example .env && 编辑 .env && ./scripts/deploy.sh
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: zdsj-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-zdsj}
+      POSTGRES_USER: ${POSTGRES_USER:-zdsj}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请设置 POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-zdsj} -d ${POSTGRES_DB:-zdsj}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  redis:
+    image: redis:7
+    container_name: zdsj-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: zdsj-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-zdsj}
+      DB_USER: ${POSTGRES_USER:-zdsj}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:?请设置 JWT_SECRET}
+      WX_APPID: ${WX_APPID:-}
+      WX_SECRET: ${WX_SECRET:-}
+      WX_SUB_TEMPLATE: ${WX_SUB_TEMPLATE:-}
+      AFFILIATE_MOCK: ${AFFILIATE_MOCK:-false}
+      PDD_CLIENT_ID: ${PDD_CLIENT_ID:-}
+      PDD_CLIENT_SECRET: ${PDD_CLIENT_SECRET:-}
+      PDD_PID: ${PDD_PID:-}
+      JD_APP_KEY: ${JD_APP_KEY:-}
+      JD_APP_SECRET: ${JD_APP_SECRET:-}
+      JD_UNION_ID: ${JD_UNION_ID:-}
+      JD_SITE_ID: ${JD_SITE_ID:-}
+      JD_POSITION_ID: ${JD_POSITION_ID:-}
+      AI_MOCK: ${AI_MOCK:-false}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL_HIGH: ${AI_MODEL_HIGH:-gpt-4o}
+      AI_MODEL_FAST: ${AI_MODEL_FAST:-gpt-4o-mini}
+    networks:
+      - internal
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: zdsj-nginx
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ${NGINX_CONF:-./nginx/default.http-only.conf}:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:
