@@ -8,7 +8,8 @@
 <scroll-view wx:else scroll-y class="page" style="height: 100vh;">
   <!-- 1. 商品基础信息 -->
   <view class="card prod">
-    <image class="prod-img" src="{{data.productInfo.imageUrl}}" mode="aspectFill" />
+    <image wx:if="{{data.productInfo.imageUrl}}" class="prod-img" src="{{data.productInfo.imageUrl}}" mode="aspectFill" />
+    <view wx:else class="prod-img prod-img-empty">暂无图片</view>
     <view class="prod-info">
       <text class="prod-title">{{data.productInfo.title}}</text>
       <view class="prod-meta">

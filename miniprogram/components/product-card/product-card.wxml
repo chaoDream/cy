@@ -1,5 +1,6 @@
 <view class="pc" bindtap="onTap">
-  <image class="pc-img" src="{{item.imageUrl}}" mode="aspectFill" lazy-load />
+  <image wx:if="{{item.imageUrl}}" class="pc-img" src="{{item.imageUrl}}" mode="aspectFill" lazy-load />
+  <view wx:else class="pc-img pc-img-empty">无图</view>
   <view class="pc-body">
     <text class="pc-title">{{item.title || item.standardName}}</text>
     <view class="pc-meta">

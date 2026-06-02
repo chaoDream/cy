@@ -1,6 +1,7 @@
 const api = require('../../api/index');
 const track = require('../../utils/track');
 const { detectFromClipboard } = require('../../utils/clipboard');
+const { resolveImageUrl } = require('../../utils/format');
 
 const app = getApp();
 
@@ -14,9 +15,13 @@ Page({
   },
 
   onLoad() {
+    const recent = (wx.getStorageSync('recentQueries') || []).map((r) => ({
+      ...r,
+      imageUrl: resolveImageUrl(r.imageUrl),
+    }));
     this.setData({
       assets: app.getAssets(),
-      recent: wx.getStorageSync('recentQueries') || [],
+      recent,
     });
   },
 
@@ -105,7 +110,7 @@ Page({
       platform: res.platform,
       itemId: res.itemId,
       title: res.productInfo.title,
-      imageUrl: res.productInfo.imageUrl,
+      imageUrl: resolveImageUrl(res.productInfo.imageUrl),
     });
     const next = recent.slice(0, 10);
     this.setData({ recent: next });

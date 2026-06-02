@@ -12,6 +12,13 @@
   background: #f2f3f5;
   flex-shrink: 0;
 }
+.pc-img-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  color: #8a9099;
+}
 .pc-body {
   flex: 1;
   margin-left: 20rpx;

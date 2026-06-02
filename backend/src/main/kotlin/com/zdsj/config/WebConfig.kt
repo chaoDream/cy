@@ -18,6 +18,7 @@ class WebConfig(
                 "/api/user/login",
                 "/api/link/parse",       // 游客可解析
                 "/api/product/analysis", // 游客可看分析
+                "/api/product/image",    // 商品主图代理
                 "/api/product/search",   // 游客可搜索
                 "/api/rank/**",          // 游客可看榜单
                 "/api/track/event",      // 游客可埋点(app_open 等)

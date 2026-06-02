@@ -2,7 +2,7 @@ const api = require('../../../api/index');
 const track = require('../../../utils/track');
 const { ensureLogin } = require('../../../utils/auth');
 const { subscribeTemplateId } = require('../../../utils/config');
-const { platformName, shopTypeName, yuan } = require('../../../utils/format');
+const { platformName, shopTypeName, yuan, resolveImageUrl } = require('../../../utils/format');
 
 const app = getApp();
 
@@ -29,6 +29,9 @@ Page({
     api
       .analysis(this.data.platform, this.data.itemId, app.getAssets())
       .then((res) => {
+        if (res.productInfo) {
+          res.productInfo.imageUrl = resolveImageUrl(res.productInfo.imageUrl);
+        }
         const crossView = (res.crossPlatform || []).map((c) => ({
           ...c,
           platformText: platformName(c.platform),
