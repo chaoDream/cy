@@ -3,6 +3,8 @@ spring:
     name: zdsj-backend
   profiles:
     active: dev
+  config:
+    import: optional:file:./application-local.yml
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/zdsj}
     username: ${DB_USER:zdsj}
@@ -29,6 +31,7 @@ spring:
 
 server:
   port: 8080
+  address: 0.0.0.0   # 允许局域网设备（真机）访问
 
 # 业务配置
 zdsj:
@@ -51,6 +54,8 @@ zdsj:
       app-key: ${JD_APP_KEY:}
       app-secret: ${JD_APP_SECRET:}
       union-id: ${JD_UNION_ID:}
+      site-id: ${JD_SITE_ID:}
+      position-id: ${JD_POSITION_ID:}
   ai:
     # 大模型：未配置 api-key 时走 mock（基于规则的确定性结论）
     mock: ${AI_MOCK:true}

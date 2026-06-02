@@ -1,0 +1,12 @@
+# 本地密钥配置（此文件已被 gitignore，不会提交到仓库）
+# 复制为 application-local.yml 并填入真实值
+
+zdsj:
+  affiliate:
+    mock: false
+    jd:
+      app-key: YOUR_JD_APP_KEY
+      app-secret: YOUR_JD_APP_SECRET
+      union-id: YOUR_JD_UNION_ID
+      # site-id: YOUR_JD_SITE_ID      # 可选，有站点 ID 时用 common 转链
+      # position-id: YOUR_JD_PID      # 可选，推广位

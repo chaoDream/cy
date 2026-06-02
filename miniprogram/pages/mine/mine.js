@@ -23,7 +23,18 @@ Page({
   },
 
   onLogin() {
-    ensureLogin().then(() => this.setData({ loggedIn: true }));
+    const { getBaseUrl, getEnv } = require('../../utils/config');
+    ensureLogin()
+      .then(() => this.setData({ loggedIn: true }))
+      .catch((err) => {
+        const baseUrl = getBaseUrl();
+        console.error('登录失败', { env: getEnv(), baseUrl, err });
+        wx.showModal({
+          title: '登录失败',
+          content: `环境: ${getEnv()}\n地址: ${baseUrl}\n\n${err.message || '网络异常'}\n\n请确认：\n1. 手机与电脑同一 Wi-Fi\n2. 手机浏览器能打开 ${baseUrl}/api/health\n3. iOS 需允许微信「本地网络」权限`,
+          showCancel: false,
+        });
+      });
   },
 
   onAssetsChange(e) {

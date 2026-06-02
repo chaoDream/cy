@@ -39,6 +39,10 @@ interface AffiliateAdapter {
     /** 拉取单品详情 */
     fun fetchItem(itemId: String): AffiliateItem?
 
+    /** 从完整分享文案拉取（短链/口令等场景） */
+    fun fetchFromShareText(linkText: String): AffiliateItem? =
+        extractItemId(linkText)?.let { fetchItem(it) }
+
     /** 关键词搜索候选商品 */
     fun search(keyword: String, limit: Int = 10): List<AffiliateItem>
 

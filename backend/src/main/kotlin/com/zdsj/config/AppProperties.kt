@@ -22,7 +22,16 @@ data class AffiliateProperties(
     val jd: Jd = Jd(),
 ) {
     data class Pdd(val clientId: String = "", val clientSecret: String = "", val pid: String = "")
-    data class Jd(val appKey: String = "", val appSecret: String = "", val unionId: String = "")
+    data class Jd(
+        val appKey: String = "",
+        val appSecret: String = "",
+        /** 联盟媒体 ID（unionId） */
+        val unionId: String = "",
+        /** 推广站点 ID（可选；未配置时用 byunionid 转链） */
+        val siteId: String = "",
+        /** 推广位 ID（可选） */
+        val positionId: String = "",
+    )
 }
 
 @ConfigurationProperties(prefix = "zdsj.ai")

@@ -1,4 +1,4 @@
-const { baseUrl } = require('./config');
+const { getBaseUrl } = require('./config');
 
 const TOKEN_KEY = 'token';
 
@@ -29,7 +29,7 @@ function request(options) {
     }
 
     wx.request({
-      url: `${baseUrl}${url}`,
+      url: `${getBaseUrl()}${url}`,
       method,
       data,
       header,
@@ -45,7 +45,9 @@ function request(options) {
         }
       },
       fail(err) {
-        reject({ code: -1, message: err.errMsg || '网络异常' });
+        const fullUrl = `${getBaseUrl()}${url}`;
+        console.error('[request fail]', fullUrl, err);
+        reject({ code: -1, message: err.errMsg || '网络异常', url: fullUrl });
       },
       complete() {
         if (showLoading) wx.hideLoading();

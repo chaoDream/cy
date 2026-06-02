@@ -13,6 +13,7 @@ import com.zdsj.price.PriceEngine
 import com.zdsj.price.PriceService
 import com.zdsj.price.PriceTrend
 import com.zdsj.price.UserAssets
+import com.zdsj.config.AffiliateProperties
 import com.zdsj.sku.SkuService
 import org.springframework.stereotype.Service
 
@@ -40,6 +41,7 @@ data class AnalysisResult(
 @Service
 class AnalysisService(
     private val registry: AffiliateRegistry,
+    private val affiliateProps: AffiliateProperties,
     private val ingestService: ProductIngestService,
     private val skuService: SkuService,
     private val priceEngine: PriceEngine,
@@ -56,13 +58,14 @@ class AnalysisService(
         }
         val detected = registry.detect(linkText)
             ?: throw BizException(ErrorCode.PLATFORM_UNSUPPORTED, "当前版本优先支持京东和拼多多")
-        val (platform, itemId) = detected
-        val item = registry.get(platform).fetchItem(itemId)
+        val (platform, _) = detected
+        val item = registry.fetchFromShareText(linkText)
             ?: throw BizException(ErrorCode.PARSE_FAILED, "暂时没识别出来，可以换一个链接试试")
+        val itemId = item.platformItemId
 
-        // 非手机品类拦截（首发仅手机/3C）
+        // 非手机品类：mock 演示数据严格拦截；真实联盟数据放行
         val parsed = skuService.parseTitle(item.title)
-        if (parsed.brand == null && !looksLikePhone(item.title)) {
+        if (affiliateProps.mock && parsed.brand == null && !looksLikePhone(item.title)) {
             throw BizException(ErrorCode.NOT_PHONE_CATEGORY, "该商品暂不在手机品类范围内")
         }
 
@@ -81,7 +84,11 @@ class AnalysisService(
     fun analyze(platformCode: String, itemId: String, assets: UserAssets): AnalysisResult {
         val platform = Platform.fromCode(platformCode)
             ?: throw BizException(ErrorCode.PLATFORM_UNSUPPORTED, "不支持的平台")
-        val item = registry.get(platform).fetchItem(itemId)
+        // 解析阶段已落库；分析页优先读库，缺图时尝试补全
+        val item = rawRepo.findByPlatformAndPlatformItemId(platform.code, itemId)
+            .map { ingestService.toAffiliateItem(it) }
+            .orElse(null)
+            ?: registry.get(platform).fetchItem(itemId)
             ?: throw BizException(ErrorCode.PARSE_FAILED, "商品已下架或解析失败")
 
         val raw = ingestService.upsert(item)
@@ -188,11 +195,14 @@ class AnalysisService(
         "platform" to item.platform,
         "itemId" to item.platformItemId,
         "title" to item.title,
-        "imageUrl" to item.imageUrl,
+        "imageUrl" to productImageProxy(item.platform, item.platformItemId),
         "shopName" to item.shopName,
         "shopType" to item.shopType,
         "rawPrice" to item.rawPrice,
         "activityTags" to item.activityTags,
         "sourceUrl" to item.sourceUrl,
     )
+
+    private fun productImageProxy(platform: String, itemId: String): String =
+        "/api/product/image?platform=$platform&item_id=$itemId"
 }

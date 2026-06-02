@@ -26,8 +26,9 @@ dependencies {
 
     // Persistence
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
+    // Spring Boot 3.2.x 管理 Flyway 9.x，PostgreSQL 支持已内置于 flyway-core
+    // （flyway-database-postgresql 是 Flyway 10 / Spring Boot 3.3+ 才有的独立模块）
     implementation("org.flywaydb:flyway-core")
-    implementation("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 
     // Cache / rate-limit
