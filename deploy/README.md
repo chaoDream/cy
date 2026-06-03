@@ -52,6 +52,39 @@ curl http://<公网IP>/api/health
 #    - miniprogram/utils/config.js：LOCAL_DEBUG=false，prod.baseUrl 改为真实域名
 ```
 
+### 本地一键部署到服务器（推荐日常更新）
+
+在**开发机**配置 SSH 目标（不提交 Git）：
+
+```bash
+cd deploy
+cp deploy.local.env.example deploy.local.env
+vim deploy.local.env   # DEPLOY_HOST / DEPLOY_USER / DEPLOY_PATH
+chmod +x scripts/push-deploy.sh
+```
+
+日常发版（先 push 再远程 pull + 重建容器）：
+
+```bash
+./scripts/push-deploy.sh --push
+```
+
+仅远程拉代码并部署（代码已在 origin 上）：
+
+```bash
+./scripts/push-deploy.sh
+```
+
+预览将执行的命令：
+
+```bash
+./scripts/push-deploy.sh --push --dry-run
+```
+
+**说明：**
+- 脚本**不会**同步 `deploy/.env` 或密钥到服务器；服务器 `.env` 仅在 CVM 上维护一份。
+- 需本机可 `ssh user@host` 免密登录；仓库已在服务器的 `DEPLOY_PATH` clone 好。
+
 ## 常用命令
 
 ```bash

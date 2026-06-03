@@ -1,4 +1,5 @@
 .env
+deploy.local.env
 certs/*.pem
 certs/*.key
 backups/*.sql
