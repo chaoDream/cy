@@ -1,6 +1,7 @@
 const { request, getToken, setToken } = require('./request');
 
 const USER_INFO_KEY = 'userInfo';
+const LOGGED_IN_KEY = 'hasLoggedIn';
 
 function getUserInfo() {
   return wx.getStorageSync(USER_INFO_KEY) || {};
@@ -14,8 +15,33 @@ function clearUserInfo() {
   wx.removeStorageSync(USER_INFO_KEY);
 }
 
+function hasLoggedIn() {
+  return !!wx.getStorageSync(LOGGED_IN_KEY);
+}
+
+function markLoggedIn() {
+  wx.setStorageSync(LOGGED_IN_KEY, true);
+}
+
+function clearLoginState() {
+  setToken('');
+  clearUserInfo();
+  wx.removeStorageSync(LOGGED_IN_KEY);
+}
+
+function applyLoginResult(data) {
+  setToken(data.token);
+  markLoggedIn();
+  const userInfo = {
+    nickname: data.nickname || '',
+    avatarUrl: data.avatarUrl || '',
+  };
+  setUserInfo(userInfo);
+  return { ...data, ...userInfo };
+}
+
 /**
- * 静默登录：仅 wx.login + code 换 token（无昵称头像，启动时用）
+ * 静默登录：wx.login + code 换 token（不传头像昵称，服务端绑定 openid 与固定随机昵称）
  */
 function login() {
   return new Promise((resolve, reject) => {
@@ -31,13 +57,7 @@ function login() {
           data: { code: res.code },
           auth: false,
         })
-          .then((data) => {
-            setToken(data.token);
-            if (data.nickname || data.avatarUrl) {
-              setUserInfo({ nickname: data.nickname, avatarUrl: data.avatarUrl });
-            }
-            resolve(data);
-          })
+          .then((data) => resolve(applyLoginResult(data)))
           .catch(reject);
       },
       fail: reject,
@@ -45,60 +65,22 @@ function login() {
   });
 }
 
-/**
- * 用户点击登录：先弹微信授权拿昵称头像，再 wx.login 换 token。
- * 必须在按钮 bindtap 里直接调用（微信要求用户主动触发）。
- */
-function loginWithProfile() {
-  return new Promise((resolve, reject) => {
-    wx.getUserProfile({
-      desc: '用于展示你的昵称和头像',
-      success(profileRes) {
-        const { nickName, avatarUrl } = profileRes.userInfo;
-        wx.login({
-          success(loginRes) {
-            if (!loginRes.code) {
-              reject(new Error('wx.login 未返回 code'));
-              return;
-            }
-            request({
-              url: '/api/user/login',
-              method: 'POST',
-              data: {
-                code: loginRes.code,
-                nickname: nickName,
-                avatarUrl,
-              },
-              auth: false,
-            })
-              .then((data) => {
-                setToken(data.token);
-                const userInfo = {
-                  nickname: data.nickname || nickName,
-                  avatarUrl: data.avatarUrl || avatarUrl,
-                };
-                setUserInfo(userInfo);
-                resolve({ ...data, ...userInfo });
-              })
-              .catch(reject);
-          },
-          fail: reject,
-        });
-      },
-      fail(err) {
-        reject({ code: -2, message: '需要授权昵称和头像才能登录', raw: err });
-      },
-    });
-  });
-}
-
-/** 静默登录：已有 token 则跳过 */
-function silentLogin() {
-  if (getToken()) return Promise.resolve({ token: getToken(), ...getUserInfo() });
+/** 与 login 相同，用于 token 失效后续登 */
+function silentRelogin() {
   return login();
 }
 
-/** 确保已登录（受保护操作前），不要求昵称头像 */
+/**
+ * 启动时恢复登录态：有 token 复用，否则静默 wx.login
+ */
+function restoreLogin() {
+  if (getToken()) {
+    return Promise.resolve({ token: getToken(), ...getUserInfo() });
+  }
+  return login();
+}
+
+/** 保证已登录（无 token 时自动静默登录，供盯价等接口使用） */
 function ensureLogin() {
   if (getToken()) return Promise.resolve();
   return login().then(() => undefined);
@@ -106,10 +88,13 @@ function ensureLogin() {
 
 module.exports = {
   login,
-  loginWithProfile,
-  silentLogin,
+  silentRelogin,
+  restoreLogin,
+  silentLogin: restoreLogin,
   ensureLogin,
   getUserInfo,
   setUserInfo,
   clearUserInfo,
+  hasLoggedIn,
+  clearLoginState,
 };

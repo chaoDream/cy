@@ -1,19 +1,23 @@
 .profile {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
 }
-.avatar {
-  width: 100rpx;
-  height: 100rpx;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #4d8df6, #1a73e8);
-  color: #fff;
-  font-size: 44rpx;
-  font-weight: 700;
+.avatar-default {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+}
+.avatar-default-icon {
+  font-size: 52rpx;
+  line-height: 1;
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+.profile-info-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
 }
 .avatar-img {
   width: 100rpx;
@@ -29,9 +33,7 @@
   gap: 10rpx;
 }
 .name { font-size: 32rpx; font-weight: 600; }
-.muted-name { font-size: 28rpx; font-weight: 500; color: #4e5969; }
 .muted { color: #8a9099; font-size: 24rpx; }
-.mini { width: 260rpx; font-size: 26rpx; }
 .block-title {
   font-size: 26rpx;
   color: #8a9099;

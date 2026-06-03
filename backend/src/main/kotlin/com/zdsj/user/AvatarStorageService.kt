@@ -51,6 +51,21 @@ class AvatarStorageService(
 
         return runCatching {
             val bytes = download(sourceUrl) ?: return null
+            persistBytes(userId, bytes)
+        }.getOrElse { e ->
+            log.warn("头像持久化失败 userId={} url={} err={}", userId, sourceUrl.take(80), e.message)
+            null
+        }
+    }
+
+    /** 小程序 chooseAvatar 上传的二进制内容 */
+    fun persistBytes(userId: Long, bytes: ByteArray): String? {
+        if (bytes.isEmpty()) return null
+        if (bytes.size > props.maxBytes) {
+            log.warn("头像过大 {} bytes", bytes.size)
+            return null
+        }
+        return runCatching {
             val ext = detectExtension(bytes)
             val fileName = "$userId.$ext"
             val target = storagePath.resolve(fileName)
@@ -63,7 +78,7 @@ class AvatarStorageService(
             )
             "${props.publicPathPrefix.trimEnd('/')}/$fileName"
         }.getOrElse { e ->
-            log.warn("头像持久化失败 userId={} url={} err={}", userId, sourceUrl.take(80), e.message)
+            log.warn("头像写入失败 userId={} err={}", userId, e.message)
             null
         }
     }

@@ -1,10 +1,7 @@
 <view class="container">
-  <view wx:if="{{needLogin}}" class="login-box">
-    <text class="muted">登录后即可盯价、收降价提醒</text>
-    <button class="btn-primary" bindtap="onLogin">微信一键登录</button>
-  </view>
+  <view wx:if="{{loading}}" class="empty">加载中…</view>
 
-  <view wx:elif="{{loading}}" class="empty">加载中…</view>
+  <view wx:elif="{{loadError}}" class="empty">{{loadError}}</view>
 
   <view wx:elif="{{!list.length}}" class="empty">还没有盯价商品，去查价页加一个吧</view>
 

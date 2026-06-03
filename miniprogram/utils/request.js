@@ -38,10 +38,9 @@ function request(options) {
         if (res.statusCode === 200 && body.code === 0) {
           resolve(body.data);
         } else if (body.code === 1401 || res.statusCode === 401) {
+          // 仅清除失效 token，保留 userInfo 与 hasLoggedIn 标记，
+          // 以便页面/启动时通过 wx.login 静默续登，对用户无感
           wx.removeStorageSync(TOKEN_KEY);
-          try {
-            wx.removeStorageSync('userInfo');
-          } catch (e) { /* ignore */ }
           reject({ code: 1401, message: '登录已过期', needLogin: true });
         } else {
           reject({ code: body.code || res.statusCode, message: body.message || '请求失败' });

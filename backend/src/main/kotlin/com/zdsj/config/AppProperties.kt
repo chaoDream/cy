@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 @ConfigurationProperties(prefix = "zdsj.jwt")
 data class JwtProperties(
     val secret: String = "",
-    val ttlSeconds: Long = 604800,
+    val ttlSeconds: Long = 7776000,
 )
 
 @ConfigurationProperties(prefix = "zdsj.wechat")

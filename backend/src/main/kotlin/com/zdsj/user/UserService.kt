@@ -19,12 +19,17 @@ class UserService(
     fun loginByCode(code: String, nickname: String?, avatarUrl: String?): LoginResult {
         val openid = wechatClient.code2Session(code).openid
         val user = userRepo.findByOpenid(openid).orElseGet {
-            val created = userRepo.save(AppUser(openid = openid, nickname = nickname))
+            val created = userRepo.save(AppUser(openid = openid, nickname = nickname ?: randomNickname()))
             profileRepo.save(UserProfile(userId = created.id!!))
             created
         }
         var changed = false
-        if (nickname != null && nickname != user.nickname) {
+        // 老用户无昵称时补一次随机昵称并持久化，避免每次登录昵称变化
+        if (user.nickname.isNullOrBlank()) {
+            user.nickname = randomNickname()
+            changed = true
+        }
+        if (nickname != null && nickname.isNotBlank() && nickname != user.nickname) {
             user.nickname = nickname
             changed = true
         }
@@ -38,8 +43,17 @@ class UserService(
         return LoginResult(token, user.id!!, user.nickname, user.avatarUrl)
     }
 
+    private fun randomNickname(): String = "省心用户${(1000..9999).random()}"
+
     fun getUser(userId: Long): AppUser =
         userRepo.findById(userId).orElseThrow { com.zdsj.common.BizException(com.zdsj.common.ErrorCode.NOT_FOUND, "用户不存在") }
+
+    @Transactional
+    fun updateAvatar(userId: Long, avatarPath: String): AppUser {
+        val user = getUser(userId)
+        user.avatarUrl = avatarPath
+        return userRepo.save(user)
+    }
 
     fun getProfile(userId: Long): UserProfile =
         profileRepo.findById(userId).orElseGet { profileRepo.save(UserProfile(userId = userId)) }

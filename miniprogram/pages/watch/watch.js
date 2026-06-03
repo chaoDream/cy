@@ -6,7 +6,7 @@ Page({
   data: {
     list: [],
     loading: true,
-    needLogin: false,
+    loadError: '',
   },
 
   onShow() {
@@ -18,17 +18,16 @@ Page({
   },
 
   _load() {
-    this.setData({ loading: true });
+    this.setData({ loading: true, loadError: '' });
     return ensureLogin()
       .then(() => api.watchList())
-      .then((list) => this.setData({ list, loading: false, needLogin: false }))
+      .then((list) => this.setData({ list, loading: false, loadError: '' }))
       .catch((err) => {
-        this.setData({ loading: false, needLogin: !!err.needLogin });
+        this.setData({
+          loading: false,
+          loadError: (err && err.message) || '加载失败，请下拉重试',
+        });
       });
-  },
-
-  onLogin() {
-    ensureLogin().then(() => this._load());
   },
 
   onEditTarget(e) {

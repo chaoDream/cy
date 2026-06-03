@@ -1,4 +1,4 @@
-const { silentLogin } = require('./utils/auth');
+const { restoreLogin } = require('./utils/auth');
 const track = require('./utils/track');
 
 App({
@@ -14,13 +14,12 @@ App({
   },
 
   onLaunch() {
-    // 恢复本地缓存的资产库勾选
     const cachedAssets = wx.getStorageSync('assets');
     if (cachedAssets) {
       this.globalData.assets = Object.assign(this.globalData.assets, cachedAssets);
     }
-    // 静默登录拿到自定义登录态 token
-    silentLogin().catch((e) => console.warn('登录失败', e));
+    // 静默 wx.login：恢复或创建登录态（openid + token，昵称由服务端固定绑定）
+    restoreLogin().catch(() => {});
     track.event('app_open');
   },
 

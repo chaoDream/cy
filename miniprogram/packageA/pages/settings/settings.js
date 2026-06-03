@@ -1,6 +1,5 @@
 const { subscribeTemplateId, getApiTarget, setApiTarget, getBaseUrl, getApiTargetLabel } = require('../../../utils/config');
-const { setToken } = require('../../../utils/request');
-const { clearUserInfo } = require('../../../utils/auth');
+const { clearLoginState } = require('../../../utils/auth');
 
 Page({
   data: {
@@ -32,8 +31,7 @@ Page({
     const target = e.currentTarget.dataset.target;
     if (target === this.data.apiTarget) return;
     setApiTarget(target);
-    setToken('');
-    clearUserInfo();
+    clearLoginState();
     this.refreshApiTarget();
     wx.showToast({
       title: target === 'remote' ? '已切换远程' : '已切换本地',

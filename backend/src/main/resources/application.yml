@@ -37,7 +37,7 @@ server:
 zdsj:
   jwt:
     secret: ${JWT_SECRET:zdsj_dev_secret_please_change_in_prod_at_least_32_bytes}
-    ttl-seconds: 604800        # 7 天
+    ttl-seconds: 7776000       # 90 天（配合小程序端 wx.login 静默续登，登录态长期保持）
   wechat:
     appid: ${WX_APPID:wx_dev_appid}
     secret: ${WX_SECRET:wx_dev_secret}

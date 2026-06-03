@@ -3,11 +3,14 @@ package com.zdsj.user
 import com.zdsj.common.ApiResponse
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.constraints.NotBlank
+import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.multipart.MultipartFile
 
 data class LoginRequest(
     @field:NotBlank val code: String = "",
@@ -25,7 +28,10 @@ data class AssetsRequest(
 
 @RestController
 @RequestMapping("/api/user")
-class UserController(private val userService: UserService) {
+class UserController(
+    private val userService: UserService,
+    private val avatarStorage: AvatarStorageService,
+) {
 
     @PostMapping("/login")
     fun login(@RequestBody req: LoginRequest): ApiResponse<LoginResult> =
@@ -56,5 +62,19 @@ class UserController(private val userService: UserService) {
         )
         val p = userService.updateAssets(request.currentUserId(), assets, req.govSubsidyRegion)
         return ApiResponse.ok(mapOf("assets" to p.assetsJson, "region" to p.region))
+    }
+
+    /** 小程序 chooseAvatar 上传头像（需已登录） */
+    @PostMapping("/avatar", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+    fun uploadAvatar(
+        request: HttpServletRequest,
+        @RequestParam("file") file: MultipartFile,
+    ): ApiResponse<Map<String, String?>> {
+        val userId = request.currentUserId()
+        val bytes = file.bytes
+        val path = avatarStorage.persistBytes(userId, bytes)
+            ?: throw com.zdsj.common.BizException(com.zdsj.common.ErrorCode.PARAM_INVALID, "头像保存失败")
+        val user = userService.updateAvatar(userId, path)
+        return ApiResponse.ok(mapOf("avatarUrl" to user.avatarUrl))
     }
 }
