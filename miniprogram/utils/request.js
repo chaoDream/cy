@@ -39,6 +39,9 @@ function request(options) {
           resolve(body.data);
         } else if (body.code === 1401 || res.statusCode === 401) {
           wx.removeStorageSync(TOKEN_KEY);
+          try {
+            wx.removeStorageSync('userInfo');
+          } catch (e) { /* ignore */ }
           reject({ code: 1401, message: '登录已过期', needLogin: true });
         } else {
           reject({ code: body.code || res.statusCode, message: body.message || '请求失败' });

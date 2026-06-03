@@ -1,13 +1,44 @@
-const { subscribeTemplateId } = require('../../../utils/config');
+const { subscribeTemplateId, getApiTarget, setApiTarget, getBaseUrl, getApiTargetLabel } = require('../../../utils/config');
+const { setToken } = require('../../../utils/request');
+const { clearUserInfo } = require('../../../utils/auth');
 
 Page({
   data: {
     defaultRule: 'auto', // auto | low30 | custom
+    apiTarget: 'local',
+    apiTargetLabel: '',
+    baseUrl: '',
   },
 
   onLoad() {
     const rule = wx.getStorageSync('defaultTargetRule') || 'auto';
+    this.refreshApiTarget();
     this.setData({ defaultRule: rule });
+  },
+
+  onShow() {
+    this.refreshApiTarget();
+  },
+
+  refreshApiTarget() {
+    this.setData({
+      apiTarget: getApiTarget(),
+      apiTargetLabel: getApiTargetLabel(),
+      baseUrl: getBaseUrl(),
+    });
+  },
+
+  onApiTargetChange(e) {
+    const target = e.currentTarget.dataset.target;
+    if (target === this.data.apiTarget) return;
+    setApiTarget(target);
+    setToken('');
+    clearUserInfo();
+    this.refreshApiTarget();
+    wx.showToast({
+      title: target === 'remote' ? '已切换远程' : '已切换本地',
+      icon: 'none',
+    });
   },
 
   onRuleChange(e) {

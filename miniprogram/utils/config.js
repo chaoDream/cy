@@ -3,6 +3,7 @@
 // 说明：上线前需在「小程序后台 → 开发设置 → 服务器域名」配置 request 合法域名（https）
 
 const ENV_STORAGE_KEY = '__zdsj_env__';
+const API_TARGET_STORAGE_KEY = '__zdsj_api_target__';
 
 // 本地联调开关：true 时强制走 dev（避免真机误连 test/prod 占位域名）
 const LOCAL_DEBUG = true;
@@ -10,12 +11,29 @@ const LOCAL_DEBUG = true;
 // 手动强制环境（可选）：'dev' | 'test' | 'prod'，空字符串表示不强制
 const FORCE_ENV = LOCAL_DEBUG ? 'dev' : '';
 
-// 真机联调：填开发机局域网 IP（系统设置 → 网络 → Wi-Fi → 详情）
-// 换 Wi-Fi 后若登录报 ERR_CONNECTION_REFUSED，先更新此项
+// ---------- API 地址一键切换（dev 环境） ----------
+// 改这一行即可默认连本地或远程：'local' | 'remote'
+const DEFAULT_API_TARGET = 'local';
+
+// 远程服务器（Nginx 80 端口，勿加 :8080）
+const REMOTE_BASE_URL = 'http://62.234.81.122';
+
+// 真机联调本地后端：填开发机局域网 IP（换 Wi-Fi 后若连不上先更新此项）
 const DEV_LAN_IP = '192.168.0.104';
 
-function resolveDevBaseUrl() {
-  // 开发者工具模拟器走 localhost；真机必须走局域网 IP（127.0.0.1 在手机上指向手机自身）
+function getApiTarget() {
+  const stored = safeGetStorageSync(API_TARGET_STORAGE_KEY);
+  if (stored === 'remote' || stored === 'local') return stored;
+  return DEFAULT_API_TARGET === 'remote' ? 'remote' : 'local';
+}
+
+function setApiTarget(target) {
+  const normalized = target === 'remote' ? 'remote' : 'local';
+  safeSetStorageSync(API_TARGET_STORAGE_KEY, normalized);
+  return normalized;
+}
+
+function resolveLocalBaseUrl() {
   if (typeof wx !== 'undefined' && wx.getSystemInfoSync) {
     try {
       if (wx.getSystemInfoSync().platform === 'devtools') {
@@ -28,6 +46,11 @@ function resolveDevBaseUrl() {
   return `http://${DEV_LAN_IP}:8080`;
 }
 
+function resolveDevBaseUrl() {
+  if (getApiTarget() === 'remote') return REMOTE_BASE_URL;
+  return resolveLocalBaseUrl();
+}
+
 const CONFIG = {
   dev: {
     get baseUrl() {
@@ -36,12 +59,10 @@ const CONFIG = {
     subscribeTemplateId: 'dev_template_id',
   },
   test: {
-    // 测试环境（示例，按你的实际地址替换）
     baseUrl: 'https://test-api.zhendaoshoujia.com',
     subscribeTemplateId: 'test_template_id',
   },
   prod: {
-    // 生产环境（必须 HTTPS）
     baseUrl: 'https://api.zhendaoshoujia.com',
     subscribeTemplateId: 'prod_template_id',
   },
@@ -70,7 +91,6 @@ function detectEnvByMiniProgram() {
   try {
     const info = wx.getAccountInfoSync();
     const envVersion = info && info.miniProgram && info.miniProgram.envVersion;
-    // develop / trial / release
     if (envVersion === 'release') return 'prod';
     if (envVersion === 'trial') return 'test';
     if (envVersion === 'develop') return 'dev';
@@ -108,13 +128,20 @@ function getBaseUrl() {
   return CONFIG[resolveEnv()].baseUrl;
 }
 
+function getApiTargetLabel() {
+  return getApiTarget() === 'remote' ? '远程服务器' : '本地服务器';
+}
+
 module.exports = {
   env,
   get baseUrl() {
     return getBaseUrl();
   },
   getBaseUrl,
-  // 微信订阅消息模板 id（降价提醒），需与后台一致
+  getApiTarget,
+  setApiTarget,
+  getApiTargetLabel,
+  REMOTE_BASE_URL,
   subscribeTemplateId: current.subscribeTemplateId,
   setEnv,
   clearEnvOverride,

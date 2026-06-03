@@ -46,6 +46,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - avatar_data:/data/avatars
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-zdsj}
@@ -71,6 +73,7 @@ services:
       AI_API_KEY: ${AI_API_KEY:-}
       AI_MODEL_HIGH: ${AI_MODEL_HIGH:-gpt-4o}
       AI_MODEL_FAST: ${AI_MODEL_FAST:-gpt-4o-mini}
+      AVATAR_STORAGE_DIR: /data/avatars
     networks:
       - internal
 
@@ -85,7 +88,9 @@ services:
       - "443:443"
     volumes:
       - ${NGINX_CONF:-./nginx/default.http-only.conf}:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/snippets:/etc/nginx/conf.d/snippets:ro
       - ./certs:/etc/nginx/certs:ro
+      - avatar_data:/data/avatars:ro
     networks:
       - internal
 
@@ -96,3 +101,4 @@ networks:
 volumes:
   pgdata:
   redisdata:
+  avatar_data:

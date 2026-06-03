@@ -21,6 +21,9 @@ class AppUser(
 
     var nickname: String? = null,
 
+    @Column(name = "avatar_url")
+    var avatarUrl: String? = null,
+
     @Column(name = "created_at")
     var createdAt: OffsetDateTime = OffsetDateTime.now(),
 )

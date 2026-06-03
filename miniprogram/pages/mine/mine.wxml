@@ -1,9 +1,12 @@
 <view class="container">
   <view class="profile card">
-    <view class="avatar">真</view>
+    <image wx:if="{{hasProfile && avatarUrl}}" class="avatar-img" src="{{avatarUrl}}" mode="aspectFill" binderror="onAvatarError" />
+    <view wx:else class="avatar">{{nickname ? nickname[0] : '真'}}</view>
     <view class="profile-info">
-      <text class="name" wx:if="{{loggedIn}}">已登录用户</text>
+      <text class="name" wx:if="{{hasProfile}}">{{nickname}}</text>
+      <text class="name muted-name" wx:elif="{{loggedIn}}">已登录，授权后可显示昵称</text>
       <button wx:else class="btn-primary mini" bindtap="onLogin">微信一键登录</button>
+      <button wx:if="{{loggedIn && !hasProfile}}" class="btn-primary mini" bindtap="onLogin">授权微信昵称头像</button>
       <text class="muted">站在用户这边的 AI 购物决策助手</text>
     </view>
   </view>

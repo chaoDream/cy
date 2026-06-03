@@ -68,6 +68,11 @@ zdsj:
     poll-hot-cron: "0 0 */2 * * ?"     # 热门 SKU 每 2h
     poll-user-cron: "0 30 */4 * * ?"   # 用户关注 每 4h
     poll-normal-cron: "0 0 4 * * ?"    # 普通 每天 04:00
+  avatar:
+    storage-dir: ${AVATAR_STORAGE_DIR:./data/avatars}
+    public-path-prefix: /static/avatars
+    max-bytes: 512000
+    download-timeout-seconds: 10
 
 logging:
   level:

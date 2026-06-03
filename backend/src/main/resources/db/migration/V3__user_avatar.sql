@@ -1,0 +1,1 @@
+ALTER TABLE app_user ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(512);

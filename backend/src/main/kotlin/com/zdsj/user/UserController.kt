@@ -9,7 +9,11 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
-data class LoginRequest(@field:NotBlank val code: String = "", val nickname: String? = null)
+data class LoginRequest(
+    @field:NotBlank val code: String = "",
+    val nickname: String? = null,
+    val avatarUrl: String? = null,
+)
 
 /** 省钱资产库（PRD §5.1） */
 data class AssetsRequest(
@@ -25,12 +29,21 @@ class UserController(private val userService: UserService) {
 
     @PostMapping("/login")
     fun login(@RequestBody req: LoginRequest): ApiResponse<LoginResult> =
-        ApiResponse.ok(userService.loginByCode(req.code, req.nickname))
+        ApiResponse.ok(userService.loginByCode(req.code, req.nickname, req.avatarUrl))
 
     @GetMapping("/profile")
     fun profile(request: HttpServletRequest): ApiResponse<Map<String, Any?>> {
-        val p = userService.getProfile(request.currentUserId())
-        return ApiResponse.ok(mapOf("assets" to p.assetsJson, "region" to p.region))
+        val userId = request.currentUserId()
+        val user = userService.getUser(userId)
+        val p = userService.getProfile(userId)
+        return ApiResponse.ok(
+            mapOf(
+                "nickname" to user.nickname,
+                "avatarUrl" to user.avatarUrl,
+                "assets" to p.assetsJson,
+                "region" to p.region,
+            ),
+        )
     }
 
     @PostMapping("/assets")

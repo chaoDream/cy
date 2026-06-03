@@ -1,5 +1,18 @@
 <view class="container">
   <view class="card">
+    <view class="card-title">API 服务器</view>
+    <text class="muted note">当前：{{apiTargetLabel}} · {{baseUrl}}</text>
+    <view class="opt {{apiTarget === 'local' ? 'on' : ''}}" data-target="local" bindtap="onApiTargetChange">
+      <text>本地服务器</text>
+      <text class="muted">开发者工具 → 127.0.0.1:8080；真机 → 局域网 IP:8080</text>
+    </view>
+    <view class="opt {{apiTarget === 'remote' ? 'on' : ''}}" data-target="remote" bindtap="onApiTargetChange">
+      <text>远程服务器</text>
+      <text class="muted">腾讯云 CVM（62.234.81.122），切换后需重新登录</text>
+    </view>
+  </view>
+
+  <view class="card">
     <view class="card-title">默认目标价规则</view>
     <view class="opt {{defaultRule === 'auto' ? 'on' : ''}}" data-rule="auto" bindtap="onRuleChange">
       <text>智能推荐（推荐）</text>
