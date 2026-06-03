@@ -3,7 +3,7 @@
 # 本地一键推送代码并在远程服务器重新部署
 #
 # 前置：
-#   1. cp deploy/deploy.local.env.example deploy/deploy.local.env 并填写 SSH 信息
+#   1. 在 deploy 目录: cp deploy.local.env.example deploy.local.env 并填写 SSH 信息
 #   2. 服务器已 clone 仓库且 deploy/.env 已配置好密钥
 #   3. 本机可免密 SSH 登录服务器（ssh-copy-id）
 #
@@ -51,8 +51,15 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ ! -f "$LOCAL_ENV" ]]; then
-  echo "未找到 deploy/deploy.local.env"
-  echo "请先执行: cp deploy/deploy.local.env.example deploy/deploy.local.env"
+  EXAMPLE="$DEPLOY_ROOT/deploy.local.env.example"
+  if [[ -f "$EXAMPLE" ]]; then
+    cp "$EXAMPLE" "$LOCAL_ENV"
+    echo "已从示例创建: $LOCAL_ENV"
+    echo "请编辑其中的 DEPLOY_HOST / DEPLOY_USER / DEPLOY_PATH 后重新运行。"
+    exit 1
+  fi
+  echo "未找到配置文件: $LOCAL_ENV"
+  echo "在 deploy 目录执行: cp deploy.local.env.example deploy.local.env"
   echo "并填写 DEPLOY_HOST / DEPLOY_USER / DEPLOY_PATH"
   exit 1
 fi
