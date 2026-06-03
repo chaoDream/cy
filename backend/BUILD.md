@@ -57,6 +57,19 @@ curl http://localhost:8080/api/health
 | `WX_APPID`/`WX_SECRET` | dev | 配置后启用真实微信登录与订阅消息 |
 | `JWT_SECRET` | dev | 生产必须替换为 ≥32 字节随机串 |
 
+## 微信小程序登录（真实 code2session）
+
+`application-local.yml` 中配置 `zdsj.wechat`，appid 须与 `miniprogram/project.config.json` 一致：
+
+```yaml
+zdsj:
+  wechat:
+    appid: YOUR_WX_APPID
+    secret: YOUR_WX_APP_SECRET
+```
+
+未配置或 appid 为 `wx_dev_*` 时，后端使用 `mock_openid_{code}`，每次 `wx.login` 可能创建新用户。
+
 ## 京东联盟（真实 API）
 
 密钥放在 `backend/application-local.yml`（已 gitignore，勿提交），可参考 `application-local.yml.example`：

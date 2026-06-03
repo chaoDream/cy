@@ -1,6 +1,8 @@
 package com.zdsj.user
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.zdsj.common.BizException
+import com.zdsj.common.ErrorCode
 import com.zdsj.config.WechatProperties
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
@@ -29,8 +31,14 @@ class WechatClient(
             "?appid=${props.appid}&secret=${props.secret}&js_code=$code&grant_type=authorization_code"
         val body = restClient.get().uri(url).retrieve().body(String::class.java)
         val node = objectMapper.readTree(body)
+        val errcode = node.path("errcode").asInt(0)
+        if (errcode != 0) {
+            val msg = node.path("errmsg").asText("微信登录失败")
+            log.warn("微信 code2session 失败 errcode={} msg={}", errcode, msg)
+            throw BizException(ErrorCode.UNAUTHORIZED, "微信登录失败，请重试")
+        }
         val openid = node.path("openid").asText(null)
-            ?: throw IllegalStateException("微信登录失败: $body")
+            ?: throw BizException(ErrorCode.UNAUTHORIZED, "微信登录失败，请重试")
         return Code2SessionResult(openid, node.path("session_key").asText(null))
     }
 }

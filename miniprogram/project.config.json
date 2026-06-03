@@ -39,8 +39,8 @@
     }
   },
   "compileType": "miniprogram",
-  "libVersion": "3.5.0",
-  "appid": "wx84fb1e35606cc631",
+  "libVersion": "3.16.1",
+  "appid": "wx236e1b2384ecba9c",
   "projectname": "zhendaoshoujia",
   "condition": {},
   "miniprogramRoot": "./",
