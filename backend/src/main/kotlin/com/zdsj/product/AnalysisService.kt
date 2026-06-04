@@ -3,6 +3,7 @@ package com.zdsj.product
 import com.zdsj.affiliate.AffiliateItem
 import com.zdsj.affiliate.AffiliateRegistry
 import com.zdsj.affiliate.Platform
+import com.zdsj.affiliate.jd.JdUnionService
 import com.zdsj.ai.AiAnalysisService
 import com.zdsj.ai.AiInput
 import com.zdsj.ai.AiResult
@@ -16,6 +17,7 @@ import com.zdsj.price.UserAssets
 import com.zdsj.config.AffiliateProperties
 import com.zdsj.sku.SkuService
 import org.springframework.stereotype.Service
+import java.math.BigDecimal
 
 /** 链接解析结果（PRD §11.1） */
 data class ParseResult(
@@ -49,6 +51,7 @@ class AnalysisService(
     private val aiService: AiAnalysisService,
     private val mappingRepo: ProductMappingRepository,
     private val rawRepo: ProductRawRepository,
+    private val jdUnionService: JdUnionService,
 ) {
 
     /** POST /api/link/parse —— 解析链接/淘口令/分享文本 */
@@ -84,12 +87,7 @@ class AnalysisService(
     fun analyze(platformCode: String, itemId: String, assets: UserAssets): AnalysisResult {
         val platform = Platform.fromCode(platformCode)
             ?: throw BizException(ErrorCode.PLATFORM_UNSUPPORTED, "不支持的平台")
-        // 解析阶段已落库；分析页优先读库，缺图时尝试补全
-        val item = rawRepo.findByPlatformAndPlatformItemId(platform.code, itemId)
-            .map { ingestService.toAffiliateItem(it) }
-            .orElse(null)
-            ?: registry.get(platform).fetchItem(itemId)
-            ?: throw BizException(ErrorCode.PARSE_FAILED, "商品已下架或解析失败")
+        val item = resolveAffiliateItem(platform, itemId)
 
         val raw = ingestService.upsert(item)
         val (sku, mapping) = skuService.resolveAndPersist(raw.id!!, item)
@@ -184,6 +182,50 @@ class AnalysisService(
                 "cpsLink" to registry.get(other).buildCpsLink(candidate.platformItemId),
             )
         }
+    }
+
+    /**
+     * 分析页商品数据：库内有残缺数据（价 0 / 无图）时向联盟或京东页抓取补全，避免一直返回旧降级记录。
+     */
+    private fun resolveAffiliateItem(platform: Platform, itemId: String): AffiliateItem {
+        val cached = rawRepo.findByPlatformAndPlatformItemId(platform.code, itemId)
+            .map { ingestService.toAffiliateItem(it) }
+            .orElse(null)
+
+        if (cached != null && !needsAffiliateRefresh(cached)) return cached
+
+        val fresh = fetchLiveItem(platform, itemId, cached)
+        return when {
+            fresh != null && (cached == null || isRicherThanCached(fresh, cached)) -> fresh
+            cached != null -> cached
+            fresh != null -> fresh
+            else -> throw BizException(ErrorCode.PARSE_FAILED, "商品已下架或解析失败")
+        }
+    }
+
+    private fun fetchLiveItem(platform: Platform, itemId: String, cached: AffiliateItem?): AffiliateItem? =
+        when (platform) {
+            Platform.JD -> runCatching {
+                jdUnionService.fetchBySkuId(
+                    skuId = itemId,
+                    sourceLink = cached?.sourceUrl,
+                    fallbackTitle = cached?.title,
+                )
+            }.getOrNull()
+            else -> runCatching { registry.get(platform).fetchItem(itemId) }.getOrNull()
+        }
+
+    private fun needsAffiliateRefresh(item: AffiliateItem): Boolean =
+        item.rawPrice.compareTo(BigDecimal.ZERO) == 0 || item.imageUrl.isNullOrBlank()
+
+    private fun isRicherThanCached(fresh: AffiliateItem, cached: AffiliateItem): Boolean {
+        val freshHasPrice = fresh.rawPrice.compareTo(BigDecimal.ZERO) > 0
+        val cachedHasPrice = cached.rawPrice.compareTo(BigDecimal.ZERO) > 0
+        val freshHasImage = !fresh.imageUrl.isNullOrBlank()
+        val cachedHasImage = !cached.imageUrl.isNullOrBlank()
+        return (freshHasPrice && !cachedHasPrice) ||
+            (freshHasImage && !cachedHasImage) ||
+            (freshHasPrice && freshHasImage)
     }
 
     private fun looksLikePhone(title: String): Boolean {

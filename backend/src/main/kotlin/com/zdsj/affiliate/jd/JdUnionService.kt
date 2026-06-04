@@ -24,19 +24,25 @@ class JdUnionService(
         return fetchBySkuId(skuId, linkText)
     }
 
-    fun fetchBySkuId(skuId: String, sourceLink: String? = null): AffiliateItem {
+    fun fetchBySkuId(skuId: String, sourceLink: String? = null, fallbackTitle: String? = null): AffiliateItem {
         queryGoodsDetail(skuId)?.let { return it.withImageFallback(skuId) }
         queryPromotionInfo(skuId)?.let { return it.withImageFallback(skuId) }
 
-        // 联盟商品查询无权限时，用分享标题 + SKU 构造最小可用数据（价格需用户以下单页为准）
+        // 联盟商品查询无权限时：分享标题 / 库内标题 + 移动端页抓主图（价格仍依赖联盟接口）
         val title = JdLinkParser.extractShareTitle(sourceLink.orEmpty())
-        if (title != null) {
-            val imageUrl = imageResolver.resolveMainImage(skuId)
-            log.info("京东联盟商品详情无权限，降级为标题解析 skuId={} title={} hasImage={}", skuId, title, imageUrl != null)
+            ?: fallbackTitle?.takeIf { it.isNotBlank() }
+        val imageUrl = imageResolver.resolveMainImage(skuId)
+        if (title != null || imageUrl != null) {
+            log.info(
+                "京东联盟商品详情无权限，降级 skuId={} title={} hasImage={}",
+                skuId,
+                title?.take(20),
+                imageUrl != null,
+            )
             return AffiliateItem(
                 platform = Platform.JD.code,
                 platformItemId = skuId,
-                title = title,
+                title = title ?: "京东商品",
                 imageUrl = imageUrl,
                 shopName = "京东",
                 shopType = "self",
