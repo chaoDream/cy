@@ -1,10 +1,7 @@
 package com.zdsj.product
 
 import com.zdsj.affiliate.Platform
-import com.zdsj.affiliate.PddLinkParser
-import com.zdsj.affiliate.jd.JdImageResolver
-import com.zdsj.affiliate.jd.JdUnionService
-import com.zdsj.affiliate.pdd.PddDdkService
+import com.zdsj.affiliate.provider.AffiliateGateway
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -28,9 +25,7 @@ import javax.imageio.ImageIO
 @RequestMapping("/api/product")
 class ProductImageController(
     private val rawRepo: ProductRawRepository,
-    private val jdUnionService: JdUnionService,
-    private val jdImageResolver: JdImageResolver,
-    private val pddDdkService: PddDdkService,
+    private val gateway: AffiliateGateway,
 ) {
 
     @GetMapping("/image")
@@ -58,25 +53,8 @@ class ProductImageController(
             ?.takeIf { it.isNotBlank() }
             ?.let { return it }
 
-        if (platform == Platform.JD.code && itemId.all { it.isDigit() }) {
-            val cached = rawRepo.findByPlatformAndPlatformItemId(platform, itemId).orElse(null)
-            runCatching {
-                jdUnionService.fetchBySkuId(
-                    itemId,
-                    sourceLink = cached?.sourceUrl,
-                    fallbackTitle = cached?.title,
-                ).imageUrl
-            }.getOrNull()
-                ?.takeIf { !it.isNullOrBlank() }
-                ?.let { return it }
-            return jdImageResolver.resolveMainImage(itemId)
-        }
-        if (platform == Platform.PDD.code && PddLinkParser.isGoodsSign(itemId)) {
-            return runCatching { pddDdkService.fetchByGoodsSign(itemId).imageUrl }
-                .getOrNull()
-                ?.takeIf { !it.isNullOrBlank() }
-        }
-        return null
+        val p = Platform.fromCode(platform) ?: return null
+        return gateway.resolveImage(p, itemId)
     }
 
     private fun buildPlaceholderPng(title: String): ByteArray {

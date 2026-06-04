@@ -1,9 +1,8 @@
 package com.zdsj.product
 
 import com.zdsj.affiliate.AffiliateItem
-import com.zdsj.affiliate.AffiliateRegistry
 import com.zdsj.affiliate.Platform
-import com.zdsj.affiliate.jd.JdUnionService
+import com.zdsj.affiliate.provider.AffiliateGateway
 import com.zdsj.ai.AiAnalysisService
 import com.zdsj.ai.AiInput
 import com.zdsj.ai.AiResult
@@ -42,7 +41,7 @@ data class AnalysisResult(
 
 @Service
 class AnalysisService(
-    private val registry: AffiliateRegistry,
+    private val gateway: AffiliateGateway,
     private val affiliateProps: AffiliateProperties,
     private val ingestService: ProductIngestService,
     private val skuService: SkuService,
@@ -51,7 +50,6 @@ class AnalysisService(
     private val aiService: AiAnalysisService,
     private val mappingRepo: ProductMappingRepository,
     private val rawRepo: ProductRawRepository,
-    private val jdUnionService: JdUnionService,
 ) {
 
     /** POST /api/link/parse —— 解析链接/淘口令/分享文本 */
@@ -59,10 +57,10 @@ class AnalysisService(
         if (linkText.isBlank()) {
             throw BizException(ErrorCode.LINK_EMPTY, "请粘贴京东或拼多多手机商品链接")
         }
-        val detected = registry.detect(linkText)
+        val detected = gateway.detect(linkText)
             ?: throw BizException(ErrorCode.PLATFORM_UNSUPPORTED, "当前版本优先支持京东和拼多多")
         val (platform, _) = detected
-        val item = registry.fetchFromShareText(linkText)
+        val item = gateway.fetchFromShareText(linkText).data
             ?: throw BizException(ErrorCode.PARSE_FAILED, "暂时没识别出来，可以换一个链接试试")
         val itemId = item.platformItemId
 
@@ -139,7 +137,7 @@ class AnalysisService(
             riskInfo = riskTags,
             aiRecommendation = ai,
             crossPlatform = cross,
-            cpsLink = registry.get(platform).buildCpsLink(itemId),
+            cpsLink = gateway.buildCpsLink(platform, itemId).data,
         )
     }
 
@@ -147,7 +145,7 @@ class AnalysisService(
     fun search(keyword: String): List<Map<String, Any?>> {
         if (keyword.isBlank()) return emptyList()
         return Platform.entries.flatMap { p ->
-            runCatching { registry.get(p).search(keyword) }.getOrDefault(emptyList())
+            gateway.search(p, keyword).data ?: emptyList()
         }.map { item ->
             val raw = ingestService.upsert(item)
             mapOf(
@@ -170,7 +168,7 @@ class AnalysisService(
         return Platform.entries.filter { it != self }.mapNotNull { other ->
             // 用标准型号在其他平台搜同款（mock 下基于标题关键词）
             val keyword = sku?.let { "${it.brand} ${it.model}" } ?: selfItem.title
-            val candidate = runCatching { registry.get(other).search(keyword).firstOrNull() }.getOrNull()
+            val candidate = gateway.search(other, keyword).data?.firstOrNull()
                 ?: return@mapNotNull null
             val price = priceEngine.compute(candidate, assets)
             mapOf(
@@ -179,7 +177,7 @@ class AnalysisService(
                 "shopName" to candidate.shopName,
                 "shopType" to candidate.shopType,
                 "estimatedFinalPrice" to price.estimatedFinalPrice,
-                "cpsLink" to registry.get(other).buildCpsLink(candidate.platformItemId),
+                "cpsLink" to gateway.buildCpsLink(other, candidate.platformItemId).data,
             )
         }
     }
@@ -204,16 +202,7 @@ class AnalysisService(
     }
 
     private fun fetchLiveItem(platform: Platform, itemId: String, cached: AffiliateItem?): AffiliateItem? =
-        when (platform) {
-            Platform.JD -> runCatching {
-                jdUnionService.fetchBySkuId(
-                    skuId = itemId,
-                    sourceLink = cached?.sourceUrl,
-                    fallbackTitle = cached?.title,
-                )
-            }.getOrNull()
-            else -> runCatching { registry.get(platform).fetchItem(itemId) }.getOrNull()
-        }
+        gateway.fetchItem(platform, itemId, bypassCache = true).data
 
     private fun needsAffiliateRefresh(item: AffiliateItem): Boolean =
         item.rawPrice.compareTo(BigDecimal.ZERO) == 0 || item.imageUrl.isNullOrBlank()

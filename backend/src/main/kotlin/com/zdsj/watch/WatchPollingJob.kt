@@ -1,7 +1,7 @@
 package com.zdsj.watch
 
-import com.zdsj.affiliate.AffiliateRegistry
 import com.zdsj.affiliate.Platform
+import com.zdsj.affiliate.provider.AffiliateGateway
 import com.zdsj.notify.NotifyService
 import com.zdsj.price.PriceEngine
 import com.zdsj.price.PriceService
@@ -30,7 +30,7 @@ class WatchPollingJob(
     private val rawRepo: ProductRawRepository,
     private val userRepo: AppUserRepository,
     private val userService: UserService,
-    private val registry: AffiliateRegistry,
+    private val gateway: AffiliateGateway,
     private val priceEngine: PriceEngine,
     private val priceService: PriceService,
     private val notifyService: NotifyService,
@@ -59,7 +59,7 @@ class WatchPollingJob(
     private fun pollOne(w: WatchItem) {
         val raw = rawRepo.findById(w.rawProductId).orElse(null) ?: return
         val platform = Platform.fromCode(raw.platform) ?: return
-        val item = registry.get(platform).fetchItem(raw.platformItemId) ?: return
+        val item = gateway.fetchItem(platform, raw.platformItemId, bypassCache = true).data ?: return
 
         val user = userRepo.findById(w.userId).orElse(null) ?: return
         val assets = UserAssets.from(userService.getProfile(w.userId).assetsJson)

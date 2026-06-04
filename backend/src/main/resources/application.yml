@@ -46,6 +46,41 @@ zdsj:
   affiliate:
     # 联盟 API：未配置时走 mock 适配器（本地可跑通闭环）
     mock: ${AFFILIATE_MOCK:true}
+    # 提供商路由：primary 主源，fallback 降级链（按序兜底），mock 永远兜底
+    # 可选值：veapi | jd_official | pdd_official | mock
+    provider:
+      jd:
+        primary: ${JD_PROVIDER_PRIMARY:mock}
+        fallback: ${JD_PROVIDER_FALLBACK:mock}
+        auto-failover: ${JD_PROVIDER_AUTO_FAILOVER:true}
+      pdd:
+        primary: ${PDD_PROVIDER_PRIMARY:mock}
+        fallback: ${PDD_PROVIDER_FALLBACK:mock}
+        auto-failover: ${PDD_PROVIDER_AUTO_FAILOVER:true}
+    # 维易 VEAPI（购买核心接口卡后填 vekey；secret 为空则不加签）
+    veapi:
+      base-url: ${VEAPI_BASE_URL:https://api.veapi.cn}
+      vekey: ${VEAPI_VEKEY:}
+      secret: ${VEAPI_SECRET:}
+      jd:
+        auth-mode: ${VEAPI_JD_AUTH_MODE:self}   # self=自有联盟号 | public=维易公共号
+        sessionkey: ${VEAPI_JD_SESSIONKEY:}
+        union-id: ${VEAPI_JD_UNION_ID:}
+        position-id: ${VEAPI_JD_POSITION_ID:}
+      pdd:
+        auth-mode: ${VEAPI_PDD_AUTH_MODE:self}
+        sessionkey: ${VEAPI_PDD_SESSIONKEY:}
+        pid: ${VEAPI_PDD_PID:}
+    # 熔断：连续失败达阈值则冷却期内跳过该 provider
+    breaker:
+      fail-threshold: ${AFFILIATE_BREAKER_THRESHOLD:3}
+      cooldown-seconds: ${AFFILIATE_BREAKER_COOLDOWN:60}
+    # Gateway 缓存 TTL（秒）
+    cache:
+      item-ttl-seconds: ${AFFILIATE_CACHE_ITEM_TTL:600}
+      cps-ttl-seconds: ${AFFILIATE_CACHE_CPS_TTL:21600}
+      empty-ttl-seconds: ${AFFILIATE_CACHE_EMPTY_TTL:45}
+      search-ttl-seconds: ${AFFILIATE_CACHE_SEARCH_TTL:120}
     pdd:
       client-id: ${PDD_CLIENT_ID:}
       client-secret: ${PDD_CLIENT_SECRET:}
