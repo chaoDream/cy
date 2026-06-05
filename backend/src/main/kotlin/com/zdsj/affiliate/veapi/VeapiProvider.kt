@@ -44,15 +44,27 @@ class VeapiProvider(
     }
 
     override fun fetchFromShareText(linkText: String): AffiliateItem? = when {
-        JdLinkParser.isJdShareText(linkText) -> {
-            val id = JdLinkParser.extractItemId(linkText)
-            if (id != null && id.all { it.isDigit() }) fetchJdItem(id) else null
-        }
+        JdLinkParser.isJdShareText(linkText) -> fetchJdFromShare(linkText)
         PddLinkParser.isPddShareText(linkText) -> {
             val keyword = PddLinkParser.extractUrl(linkText) ?: PddLinkParser.extractShareTitle(linkText)
             keyword?.let { pddSearch(it, 1).firstOrNull() }
         }
         else -> null
+    }
+
+    /** 京东分享：数字 SKU 直查；短链/口令用 URL 或标题走搜索补全 */
+    private fun fetchJdFromShare(linkText: String): AffiliateItem? {
+        val numericId = JdLinkParser.extractItemId(linkText)?.takeIf { it.all { c -> c.isDigit() } }
+        if (numericId != null) fetchJdItem(numericId)?.let { return it }
+
+        val url = JdLinkParser.extractUrl(linkText)
+        if (url != null) {
+            jdSearch(url, 1).firstOrNull()?.let { return it }
+        }
+        JdLinkParser.extractShareTitle(linkText)?.let { title ->
+            jdSearch(title, 1).firstOrNull()?.let { return it }
+        }
+        return null
     }
 
     override fun search(ctx: AffiliateContext, keyword: String, limit: Int): List<AffiliateItem> = when (ctx.platform) {

@@ -201,8 +201,16 @@ class AnalysisService(
         }
     }
 
-    private fun fetchLiveItem(platform: Platform, itemId: String, cached: AffiliateItem?): AffiliateItem? =
-        gateway.fetchItem(platform, itemId, bypassCache = true).data
+    private fun fetchLiveItem(platform: Platform, itemId: String, cached: AffiliateItem?): AffiliateItem? {
+        // 短链占位 ID（jd_short_*）无法直接查 SKU，优先用库内原始分享链接/URL 重新拉取
+        if (platform == Platform.JD && itemId.startsWith("jd_short_")) {
+            val share = cached?.sourceUrl?.takeIf { it.isNotBlank() }
+            if (share != null) {
+                gateway.fetchFromShareText(share).data?.let { return it }
+            }
+        }
+        return gateway.fetchItem(platform, itemId, bypassCache = true).data
+    }
 
     private fun needsAffiliateRefresh(item: AffiliateItem): Boolean =
         item.rawPrice.compareTo(BigDecimal.ZERO) == 0 || item.imageUrl.isNullOrBlank()

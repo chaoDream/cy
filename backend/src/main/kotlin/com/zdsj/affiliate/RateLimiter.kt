@@ -11,13 +11,14 @@ import java.time.Duration
 @Component
 class RateLimiter(private val redis: RedisTemplate<String, Any>) {
 
-    /** 在窗口内是否允许调用 */
-    fun tryAcquire(key: String, maxPerWindow: Long, window: Duration): Boolean {
-        val redisKey = "ratelimit:$key"
-        val count = redis.opsForValue().increment(redisKey) ?: 1L
-        if (count == 1L) {
-            redis.expire(redisKey, window)
-        }
-        return count <= maxPerWindow
-    }
+    /** 在窗口内是否允许调用；Redis 不可用时放行，避免拖垮主链路 */
+    fun tryAcquire(key: String, maxPerWindow: Long, window: Duration): Boolean =
+        runCatching {
+            val redisKey = "ratelimit:$key"
+            val count = redis.opsForValue().increment(redisKey) ?: 1L
+            if (count == 1L) {
+                redis.expire(redisKey, window)
+            }
+            count <= maxPerWindow
+        }.getOrDefault(true)
 }

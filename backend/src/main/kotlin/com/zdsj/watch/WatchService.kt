@@ -5,6 +5,7 @@ import com.zdsj.common.ErrorCode
 import com.zdsj.price.PriceService
 import com.zdsj.product.ProductMappingRepository
 import com.zdsj.product.ProductRawRepository
+import com.zdsj.user.AppUserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
@@ -17,6 +18,7 @@ class WatchService(
     private val rawRepo: ProductRawRepository,
     private val mappingRepo: ProductMappingRepository,
     private val priceService: PriceService,
+    private val userRepo: AppUserRepository,
 ) {
 
     /**
@@ -27,6 +29,10 @@ class WatchService(
      */
     @Transactional
     fun create(userId: Long, rawProductId: Long, skuId: Long?, targetPrice: BigDecimal?): WatchItem {
+        // token 中 userId 可能因数据库重置而失效，提前返回业务错误，避免 DB 外键异常 500
+        if (!userRepo.existsById(userId)) {
+            throw BizException(ErrorCode.UNAUTHORIZED, "登录态已失效，请重新进入小程序登录后再试")
+        }
         val raw = rawRepo.findById(rawProductId)
             .orElseThrow { BizException(ErrorCode.NOT_FOUND, "商品不存在") }
         val resolvedSkuId = skuId ?: mappingRepo.findByRawProductId(rawProductId).map { it.skuId }.orElse(null)

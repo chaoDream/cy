@@ -8,6 +8,23 @@ zdsj:
     # subscribe-template-id: YOUR_SUBSCRIBE_TEMPLATE_ID  # 可选，降价提醒订阅消息
   affiliate:
     mock: false
+    provider:
+      jd:
+        primary: veapi
+        fallback: jd_official,mock
+      pdd:
+        primary: veapi
+        fallback: mock
+    veapi:
+      vekey: YOUR_VEAPI_VEKEY
+      secret: YOUR_VEAPI_SECRET   # 可选，与会员中心一致时填写
+      jd:
+        auth-mode: self
+        union-id: YOUR_JD_UNION_ID
+        # position-id: YOUR_JD_POSITION_ID
+      pdd:
+        auth-mode: self
+        pid: YOUR_PDD_PID
     jd:
       app-key: YOUR_JD_APP_KEY
       app-secret: YOUR_JD_APP_SECRET

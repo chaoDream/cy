@@ -48,8 +48,7 @@ class AiAnalysisService(
 
     fun analyze(skuId: Long?, input: AiInput): AiResult {
         val cacheKey = "ai:analysis:${input.platform}:${skuId ?: input.title.hashCode()}:${input.currentFinalPrice}"
-        @Suppress("UNCHECKED_CAST")
-        (redis.opsForValue().get(cacheKey) as? AiResult)?.let { return it }
+        readCache(cacheKey)?.let { return it }
 
         val result = if (props.mock || props.apiKey.isBlank()) {
             ruleBased(input)
@@ -73,8 +72,16 @@ class AiAnalysisService(
                 confidence = result.confidence,
             ),
         )
-        redis.opsForValue().set(cacheKey, result, Duration.ofHours(6))
+        writeCache(cacheKey, result)
         return result
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun readCache(key: String): AiResult? =
+        runCatching { redis.opsForValue().get(key) as? AiResult }.getOrNull()
+
+    private fun writeCache(key: String, result: AiResult) {
+        runCatching { redis.opsForValue().set(key, result, Duration.ofHours(6)) }
     }
 
     /** 确定性规则推理（mock / 降级）。结论可追溯到价格事实。 */
