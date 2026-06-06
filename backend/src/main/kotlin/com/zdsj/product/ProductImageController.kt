@@ -1,15 +1,17 @@
 package com.zdsj.product
 
 import com.zdsj.affiliate.Platform
+import com.zdsj.affiliate.ProductImageUrls
+import com.zdsj.affiliate.jd.JdImageResolver
 import com.zdsj.affiliate.provider.AffiliateGateway
 import org.springframework.http.HttpHeaders
-import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.client.RestClient
 import java.awt.Color
 import java.awt.Font
 import java.awt.RenderingHints
@@ -19,14 +21,16 @@ import javax.imageio.ImageIO
 
 /**
  * 商品主图代理：小程序统一走 API 域名加载图片；
- * 有联盟主图则 302 跳转 CDN，否则返回 SVG 占位图。
+ * 有联盟主图则由服务端拉取并回传图片字节（小程序 image 组件不跟 302），否则返回 PNG 占位图。
  */
 @RestController
 @RequestMapping("/api/product")
 class ProductImageController(
     private val rawRepo: ProductRawRepository,
     private val gateway: AffiliateGateway,
+    private val jdImageResolver: JdImageResolver,
 ) {
+    private val restClient = RestClient.create()
 
     @GetMapping("/image")
     fun image(
@@ -34,9 +38,12 @@ class ProductImageController(
         @RequestParam("item_id") itemId: String,
     ): ResponseEntity<ByteArray> {
         resolveImageUrl(platform, itemId)?.let { url ->
-            return ResponseEntity.status(HttpStatus.FOUND)
-                .header(HttpHeaders.LOCATION, url)
-                .build()
+            fetchImageBytes(url)?.let { bytes ->
+                return ResponseEntity.ok()
+                    .contentType(guessMediaType(url))
+                    .header(HttpHeaders.CACHE_CONTROL, "public, max-age=3600")
+                    .body(bytes)
+            }
         }
         val title = rawRepo.findByPlatformAndPlatformItemId(platform, itemId)
             .map { it.title }
@@ -50,11 +57,38 @@ class ProductImageController(
         rawRepo.findByPlatformAndPlatformItemId(platform, itemId)
             .map { it.imageUrl }
             .orElse(null)
-            ?.takeIf { it.isNotBlank() }
+            ?.takeIf { ProductImageUrls.isLoadable(it) }
             ?.let { return it }
 
         val p = Platform.fromCode(platform) ?: return null
-        return gateway.resolveImage(p, itemId)
+        gateway.resolveImage(p, itemId)
+            ?.takeIf { ProductImageUrls.isLoadable(it) }
+            ?.let { return it }
+
+        // 维易/官方均失败时：京东数字 SKU 尝试页面公开主图兜底
+        if (p == Platform.JD && itemId.all { it.isDigit() }) {
+            return jdImageResolver.resolveMainImage(itemId)
+                ?.takeIf { ProductImageUrls.isLoadable(it) }
+        }
+        return null
+    }
+
+    private fun fetchImageBytes(url: String): ByteArray? {
+        val normalized = if (url.startsWith("//")) "https:$url" else url
+        return runCatching {
+            restClient.get()
+                .uri(normalized)
+                .header("User-Agent", "Mozilla/5.0")
+                .header("Referer", "https://m.jd.com/")
+                .retrieve()
+                .body(ByteArray::class.java)
+        }.getOrNull()?.takeIf { it.isNotEmpty() }
+    }
+
+    private fun guessMediaType(url: String): MediaType = when {
+        url.contains(".png", ignoreCase = true) -> MediaType.IMAGE_PNG
+        url.contains(".webp", ignoreCase = true) -> MediaType.parseMediaType("image/webp")
+        else -> MediaType.IMAGE_JPEG
     }
 
     private fun buildPlaceholderPng(title: String): ByteArray {

@@ -38,9 +38,12 @@ class ProductController(
         @RequestParam platform: String,
         @RequestParam("item_id") itemId: String,
         @RequestParam(required = false) assets: String?,
+        @RequestParam(required = false) uid: String?,
     ): ApiResponse<AnalysisResult> {
         val userAssets = parseAssets(assets)
-        return ApiResponse.ok(analysisService.analyze(platform, itemId, userAssets))
+        // 登录用户透传 uid → 拼多多 custom_parameters，用于比价预判；游客为 null
+        val userKey = com.zdsj.affiliate.pdd.PddCustomParams.of(uid)
+        return ApiResponse.ok(analysisService.analyze(platform, itemId, userAssets, userKey))
     }
 
     @GetMapping("/search")

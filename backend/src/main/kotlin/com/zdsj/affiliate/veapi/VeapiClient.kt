@@ -42,11 +42,10 @@ class VeapiClient(
         params.forEach { (k, v) -> if (!v.isNullOrBlank()) builder.queryParam(k, v) }
         val uri = builder.encode().build().toUri()
 
-        val raw = runCatching {
-            restClient.get().uri(uri).retrieve().body(String::class.java)
-        }.getOrElse {
-            log.warn("[veapi] 请求失败 path={} err={}", path, it.message)
-            return null
+        val raw = request(uri) ?: run {
+            // 官方文档以 http 为主；https 在本环境常握手失败，自动降级 http 重试一次
+            val httpUri = uri.toString().replaceFirst("https://", "http://")
+            if (httpUri != uri.toString()) request(java.net.URI.create(httpUri)) else null
         } ?: return null
 
         val root = runCatching { objectMapper.readTree(raw) }.getOrNull()
@@ -66,4 +65,11 @@ class VeapiClient(
         builder.queryParam("vekey", veapi.vekey)
         if (veapi.secret.isNotBlank()) builder.queryParam("secret", veapi.secret)
     }
+
+    private fun request(uri: java.net.URI): String? =
+        runCatching { restClient.get().uri(uri).retrieve().body(String::class.java) }
+            .getOrElse {
+                log.warn("[veapi] 请求失败 uri={} err={}", uri, it.message)
+                null
+            }
 }

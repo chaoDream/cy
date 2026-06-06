@@ -33,13 +33,16 @@ class AffiliateGateway(
         return result
     }
 
-    fun buildCpsLink(platform: Platform, itemId: String): AffiliateResult<String> {
-        cache.getCps(platform, itemId)?.let {
-            return AffiliateResult(it.data, "cache", fromCache = true, degraded = it.data == null)
+    fun buildCpsLink(platform: Platform, itemId: String, userKey: String? = null): AffiliateResult<String> {
+        // 带用户标识时（拼多多比价预判按用户而异）不走共享缓存，避免跨用户串味
+        if (userKey == null) {
+            cache.getCps(platform, itemId)?.let {
+                return AffiliateResult(it.data, "cache", fromCache = true, degraded = it.data == null)
+            }
         }
-        val ctx = contextFor(platform, bypassCache = false)
+        val ctx = contextFor(platform, bypassCache = false, userKey = userKey)
         val result = runChain(platform, "buildCpsLink") { it.buildCpsLink(ctx, itemId) }
-        cache.putCps(platform, itemId, result.data)
+        if (userKey == null) cache.putCps(platform, itemId, result.data)
         return result
     }
 
@@ -152,7 +155,7 @@ class AffiliateGateway(
         Platform.PDD -> props.provider.pdd
     }
 
-    private fun contextFor(platform: Platform, bypassCache: Boolean): AffiliateContext {
+    private fun contextFor(platform: Platform, bypassCache: Boolean, userKey: String? = null): AffiliateContext {
         val mode = when (platform) {
             Platform.JD -> props.veapi.jd.authMode
             Platform.PDD -> props.veapi.pdd.authMode
@@ -161,6 +164,7 @@ class AffiliateGateway(
             platform = platform,
             bypassCache = bypassCache,
             authMode = if (mode.equals("public", ignoreCase = true)) AuthMode.PUBLIC else AuthMode.SELF,
+            userKey = userKey,
         )
     }
 }

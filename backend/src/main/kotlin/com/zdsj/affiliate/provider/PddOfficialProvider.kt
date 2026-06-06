@@ -47,7 +47,8 @@ class PddOfficialProvider(
 
     override fun buildCpsLink(ctx: AffiliateContext, itemId: String): String? {
         if (!PddLinkParser.isGoodsSign(itemId)) return null
-        return pddDdkService.buildCpsLink(itemId)
+        // ctx.userKey 为已格式化的 custom_parameters（备案用户）；游客为 null（不触发预判）
+        return pddDdkService.buildCpsLink(itemId, customParameters = ctx.userKey)
     }
 
     private fun guardRate() {

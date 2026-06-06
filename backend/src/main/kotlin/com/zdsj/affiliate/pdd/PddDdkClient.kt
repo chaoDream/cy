@@ -30,12 +30,13 @@ class PddDdkClient(
 
     fun hasPid(): Boolean = pdd.pid.isNotBlank()
 
-    /** 关键词/链接/goodsSign 搜索商品 */
+    /** 关键词/链接/goodsSign 搜索商品。带 custom_parameters 时返回 predict_promotion_rate 可用于比价预判 */
     fun searchGoods(
         keyword: String? = null,
         goodsSignList: List<String>? = null,
         pageSize: Int = 10,
         withCoupon: Boolean = false,
+        customParameters: String? = null,
     ): JsonNode? {
         val body = mutableMapOf<String, Any?>(
             "page" to 1,
@@ -44,18 +45,51 @@ class PddDdkClient(
         )
         if (!keyword.isNullOrBlank()) body["keyword"] = keyword
         if (!goodsSignList.isNullOrEmpty()) body["goods_sign_list"] = goodsSignList
+        if (pdd.pid.isNotBlank()) body["pid"] = pdd.pid
+        if (!customParameters.isNullOrBlank()) body["custom_parameters"] = customParameters
         return invoke("pdd.ddk.goods.search", body)
     }
 
-    /** 按 goodsSign 查详情 */
-    fun goodsDetail(goodsSignList: List<String>): JsonNode? =
-        invoke("pdd.ddk.goods.detail", mapOf("goods_sign_list" to goodsSignList))
+    /** 按 goodsSign 查详情。带 custom_parameters 时返回 predict_promotion_rate 可用于比价预判 */
+    fun goodsDetail(goodsSignList: List<String>, customParameters: String? = null): JsonNode? {
+        val body = mutableMapOf<String, Any?>("goods_sign_list" to goodsSignList)
+        if (pdd.pid.isNotBlank()) body["pid"] = pdd.pid
+        if (!customParameters.isNullOrBlank()) body["custom_parameters"] = customParameters
+        return invoke("pdd.ddk.goods.detail", body)
+    }
+
+    /**
+     * 用户备案：将 pid + custom_parameters 与拼多多用户绑定（多多进宝官方比价规避前置）。
+     * channel_type=10、generate_we_app=true 用于小程序授权跳转。
+     * 返回含 we_app_info（app_id / page_path），前端据此跳转拼多多完成授权。
+     */
+    fun bindAuthority(customParameters: String): JsonNode? {
+        if (!hasPid()) return null
+        return invoke(
+            "pdd.ddk.rp.prom.url.generate",
+            mapOf(
+                "p_id_list" to listOf(pdd.pid),
+                "channel_type" to 10,
+                "generate_we_app" to true,
+                "custom_parameters" to customParameters,
+            ),
+        )
+    }
+
+    /** 查询 pid + custom_parameters 是否已备案 */
+    fun queryAuthority(customParameters: String? = null): JsonNode? {
+        if (!hasPid()) return null
+        val body = mutableMapOf<String, Any?>("pid" to pdd.pid)
+        if (!customParameters.isNullOrBlank()) body["custom_parameters"] = customParameters
+        return invoke("pdd.ddk.member.authority.query", body)
+    }
 
     /** 生成推广链接（需配置 pid） */
     fun generatePromotionUrl(
         goodsSignList: List<String>,
         searchId: String? = null,
         generateShortUrl: Boolean = true,
+        customParameters: String? = null,
     ): JsonNode? {
         if (!hasPid()) return null
         val body = mutableMapOf<String, Any?>(
@@ -64,6 +98,7 @@ class PddDdkClient(
             "generate_short_url" to generateShortUrl,
         )
         if (!searchId.isNullOrBlank()) body["search_id"] = searchId
+        if (!customParameters.isNullOrBlank()) body["custom_parameters"] = customParameters
         return invoke("pdd.ddk.goods.promotion.url.generate", body)
     }
 

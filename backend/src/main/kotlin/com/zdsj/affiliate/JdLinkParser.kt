@@ -43,6 +43,10 @@ object JdLinkParser {
     fun extractShareTitle(text: String): String? =
         shareTitleRegex.find(text)?.groupValues?.get(1)?.trim()?.takeIf { it.isNotEmpty() }
 
+    /** 降维召回关键词（剔除颜色/容量/版本等规格词）：标题优先，其次整段文案 */
+    fun extractKeyword(linkText: String): String? =
+        KeywordDegrader.degrade(extractShareTitle(linkText) ?: linkText)
+
     /** 从 URL path/query 提取数字 SKU（短链跳转前有时已带 sku） */
     fun extractItemIdFromUrl(url: String): String? {
         itemIdRegex.find(url)?.let { return it.groupValues[1] }

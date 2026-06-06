@@ -52,7 +52,7 @@ object MockCatalog {
             platform = platform.code,
             platformItemId = itemId,
             title = seed.title,
-            imageUrl = "https://example.com/img/${seed.keyword}.jpg",
+            imageUrl = null,
             shopName = if (isPdd) "${seed.brand}官方旗舰店" else "${seed.brand}京东自营旗舰店",
             shopType = shopType,
             rawPrice = rawPrice,

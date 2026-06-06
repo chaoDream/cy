@@ -51,6 +51,10 @@ object PddLinkParser {
     fun toSearchKeyword(linkText: String): String? =
         extractUrl(linkText) ?: extractShareTitle(linkText)
 
+    /** 降维召回关键词（剔除颜色/容量/版本等规格词）：标题优先，其次整段文案 */
+    fun extractKeyword(linkText: String): String? =
+        KeywordDegrader.degrade(extractShareTitle(linkText) ?: linkText)
+
     fun extractUrl(text: String): String? =
         Regex("""https?://[^\s「」【】]+""").find(text)?.value
             ?.trimEnd('，', '。', ',', '.', ';', '；')

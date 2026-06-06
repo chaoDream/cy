@@ -1,6 +1,6 @@
 const api = require('../../../api/index');
 const track = require('../../../utils/track');
-const { ensureLogin } = require('../../../utils/auth');
+const { ensureLogin, getUserId } = require('../../../utils/auth');
 const { subscribeTemplateId } = require('../../../utils/config');
 const { platformName, shopTypeName, yuan, resolveImageUrl } = require('../../../utils/format');
 
@@ -16,6 +16,8 @@ Page({
     platformText: '',
     shopTypeText: '',
     crossView: [],
+    // 同款是否可直接购买（拼多多比价预判命中时为 false，引导看更优选择）
+    sameItemBuyable: true,
   },
 
   onLoad(query) {
@@ -27,7 +29,7 @@ Page({
   _load() {
     this.setData({ loading: true, error: '' });
     api
-      .analysis(this.data.platform, this.data.itemId, app.getAssets())
+      .analysis(this.data.platform, this.data.itemId, app.getAssets(), getUserId())
       .then((res) => {
         if (res.productInfo) {
           res.productInfo.imageUrl = resolveImageUrl(res.productInfo.imageUrl);
@@ -38,14 +40,20 @@ Page({
           shopTypeText: shopTypeName(c.shopType),
           price: yuan(c.estimatedFinalPrice),
         }));
+        // 同款 cpsLink 为空 = 拼多多比价预判命中（佣金归零），引导走更优选择
+        const sameItemBuyable = !!res.cpsLink;
         this.setData({
           loading: false,
           data: res,
           platformText: platformName(res.productInfo.platform),
           shopTypeText: shopTypeName(res.productInfo.shopType),
           crossView,
+          sameItemBuyable,
         });
-        track.event('analysis_view', { platform: this.data.platform });
+        track.event('analysis_view', {
+          platform: this.data.platform,
+          is_price_compare: !sameItemBuyable,
+        });
       })
       .catch((err) => {
         this.setData({ loading: false, error: err.message || '加载失败' });
@@ -94,14 +102,58 @@ Page({
     });
   },
 
-  // 去购买：走 CPS 转链（透明披露）
+  // 去购买：同款可购则走同款；比价预判命中则引导更优选择
   onBuy() {
     const link = this.data.data.cpsLink;
-    track.event('purchase_click', { platform: this.data.platform, is_cps_matched: !!link });
-    if (!link) {
-      wx.showToast({ title: '暂无购买链接', icon: 'none' });
+    if (link) {
+      track.event('purchase_click', {
+        platform: this.data.platform,
+        is_cps_matched: true,
+        is_price_compare: false,
+        source: 'same_item',
+      });
+      this._copyAndGuide(link);
       return;
     }
+    // 同款比价无返利：引导走差异化/跨平台更优选择
+    track.event('purchase_click', {
+      platform: this.data.platform,
+      is_cps_matched: false,
+      is_price_compare: true,
+      source: 'same_item_blocked',
+    });
+    const best = (this.data.crossView || []).find((c) => c.cpsLink);
+    if (best) {
+      wx.showModal({
+        title: '为你找到更优选择',
+        content: `这款直接购买可能无返利，推荐 ${best.platformText} 同款 ¥${best.price}，是否前往？`,
+        confirmText: '看看',
+        success: (r) => {
+          if (r.confirm) this._copyAndGuide(best.cpsLink);
+        },
+      });
+    } else {
+      wx.showToast({ title: '建议在下方更优选择中挑选', icon: 'none' });
+    }
+  },
+
+  // 跨平台/差异化推荐项直接购买
+  onBuyCross(e) {
+    const idx = e.currentTarget.dataset.idx;
+    const item = (this.data.crossView || [])[idx];
+    if (!item || !item.cpsLink) {
+      wx.showToast({ title: '该商品暂无购买链接', icon: 'none' });
+      return;
+    }
+    track.event('purchase_click', {
+      platform: item.platform,
+      is_cps_matched: true,
+      source: 'cross_platform',
+    });
+    this._copyAndGuide(item.cpsLink);
+  },
+
+  _copyAndGuide(link) {
     wx.setClipboardData({
       data: link,
       success: () => wx.showModal({

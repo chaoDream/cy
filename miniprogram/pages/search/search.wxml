@@ -8,21 +8,17 @@
     </view>
   </view>
 
-  <!-- 输入区 -->
+  <!-- 统一输入区：粘贴链接 / 搜索机型 二合一 -->
   <view class="card">
     <textarea
       class="link-input"
-      placeholder="粘贴京东 / 拼多多手机商品链接或分享文本"
+      placeholder="粘贴京东 / 拼多多链接，或搜索机型，如 iPhone 16 Pro"
       value="{{linkText}}"
       bindinput="onInput"
       maxlength="2000"
       auto-height
     />
-    <button class="btn-primary parse-btn" bindtap="onParse">算真实到手价</button>
-    <view class="search-line">
-      <input class="search-input" placeholder="或搜索机型，如 iPhone 16 Pro" bindinput="onSearchInput" bindconfirm="onSearch" />
-      <text class="search-go" bindtap="onSearch">搜索</text>
-    </view>
+    <button class="btn-primary parse-btn" bindtap="onQuery">查一下</button>
   </view>
 
   <!-- 省钱资产库 -->

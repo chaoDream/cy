@@ -75,6 +75,13 @@
 }
 .cross-item:last-child { border-bottom: none; }
 .cross-left { display: flex; align-items: center; gap: 12rpx; }
+.cross-buy { margin: 0 0 0 16rpx; }
+.cross-hint {
+  font-size: 22rpx;
+  line-height: 1.5;
+  padding: 8rpx 0 16rpx;
+  color: #b0742a;
+}
 
 .compliance {
   padding: 0 8rpx;

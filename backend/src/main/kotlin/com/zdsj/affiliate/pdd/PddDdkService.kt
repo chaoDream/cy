@@ -68,8 +68,14 @@ class PddDdkService(
         return extractGoodsList(data).mapNotNull { mapGoodsNode(it) }
     }
 
-    fun buildCpsLink(goodsSign: String, searchId: String? = null): String? {
-        val data = client.generatePromotionUrl(listOf(goodsSign), searchId) ?: return null
+    fun buildCpsLink(goodsSign: String, searchId: String? = null, customParameters: String? = null): String? {
+        // 比价预判：备案用户（带 custom_parameters）若被判定为比价订单（佣金归零），不生成购买链接
+        if (customParameters != null && isPriceCompare(goodsSign, customParameters)) {
+            log.info("拼多多比价预判命中，跳过转链 goodsSign={} cp={}", goodsSign, customParameters)
+            return null
+        }
+        val data = client.generatePromotionUrl(listOf(goodsSign), searchId, customParameters = customParameters)
+            ?: return null
         val list = data.path("goods_promotion_url_list")
         if (!list.isArray || list.isEmpty) return null
         val first = list[0]
@@ -77,6 +83,36 @@ class PddDdkService(
             ?: first.path("short_url").asText(null)
             ?: first.path("url").asText(null)
     }
+
+    /**
+     * 比价预判：predict_promotion_rate == 0 视为比价订单（佣金归零）。
+     * 需 pid + custom_parameters 已备案；查不到预判数据时返回 false（不拦截，交后续流程）。
+     */
+    fun isPriceCompare(goodsSign: String, customParameters: String): Boolean {
+        val node = runCatching { client.goodsDetail(listOf(goodsSign), customParameters) }
+            .getOrNull()?.let { firstGoods(it.path("goods_details")) }
+            ?: runCatching {
+                client.searchGoods(goodsSignList = listOf(goodsSign), pageSize = 1, customParameters = customParameters)
+            }.getOrNull()?.let { firstGoods(it.path("goods_list")) }
+            ?: return false
+        val predict = node.path("predict_promotion_rate")
+        if (predict.isMissingNode || predict.isNull) return false
+        return predict.asInt(-1) == 0
+    }
+
+    /** 用户备案（pid + custom_parameters 绑定拼多多用户），返回小程序授权跳转信息 */
+    fun bindAuthority(customParameters: String): JsonNode? = client.bindAuthority(customParameters)
+
+    /** 查询是否已备案 */
+    fun isAuthorized(customParameters: String): Boolean {
+        val data = client.queryAuthority(customParameters) ?: return false
+        return data.path("bind_status").asInt(0) == 1 ||
+            data.path("is_bind").asBoolean(false) ||
+            data.path("data").path("bind_status").asInt(0) == 1
+    }
+
+    private fun firstGoods(list: JsonNode): JsonNode? =
+        if (list.isArray && !list.isEmpty) list[0] else null
 
     private fun resolveGoodsSign(linkText: String): String? {
         val url = PddLinkParser.extractUrl(linkText)

@@ -33,11 +33,18 @@ function applyLoginResult(data) {
   setToken(data.token);
   markLoggedIn();
   const userInfo = {
+    userId: data.userId || '',
     nickname: data.nickname || '',
     avatarUrl: data.avatarUrl || '',
   };
   setUserInfo(userInfo);
   return { ...data, ...userInfo };
+}
+
+/** 当前登录用户 id（未登录返回空串）；用于拼多多 custom_parameters 透传 */
+function getUserId() {
+  const info = getUserInfo();
+  return info && info.userId ? String(info.userId) : '';
 }
 
 /**
@@ -93,6 +100,7 @@ module.exports = {
   silentLogin: restoreLogin,
   ensureLogin,
   getUserInfo,
+  getUserId,
   setUserInfo,
   clearUserInfo,
   hasLoggedIn,

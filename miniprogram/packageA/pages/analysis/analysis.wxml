@@ -55,15 +55,25 @@
     <price-trend trend="{{data.trendInfo}}" />
   </view>
 
-  <!-- 7. 同款对比 -->
+  <!-- 7. 更优选择（差异化 / 跨平台） -->
   <view class="card" wx:if="{{crossView.length}}">
-    <text class="card-title">跨平台同款对比</text>
+    <text class="card-title">更优选择（差异化 / 跨平台）</text>
+    <view wx:if="{{!sameItemBuyable}}" class="cross-hint muted">
+      这款直接购买可能无返利，以下为更划算的同型号或跨平台选择
+    </view>
     <view class="cross-item" wx:for="{{crossView}}" wx:key="itemId">
       <view class="cross-left">
         <text class="tag">{{item.platformText}}</text>
         <text class="muted">{{item.shopTypeText}}</text>
       </view>
       <text class="price">¥{{item.price}}</text>
+      <button
+        wx:if="{{item.cpsLink}}"
+        class="btn-ghost cross-buy"
+        size="mini"
+        data-idx="{{index}}"
+        bindtap="onBuyCross"
+      >去购买</button>
     </view>
   </view>
 
@@ -80,5 +90,5 @@
 <view wx:if="{{data}}" class="action-bar">
   <view class="action-sub" bindtap="onFeedback">反馈错误</view>
   <button class="btn-ghost action-watch" bindtap="onWatch">盯价</button>
-  <button class="btn-primary action-buy" bindtap="onBuy">去购买</button>
+  <button class="btn-primary action-buy" bindtap="onBuy">{{sameItemBuyable ? '去购买' : '看更优选择'}}</button>
 </view>

@@ -5,15 +5,19 @@ module.exports = {
   parseLink: (linkText) =>
     request({ url: '/api/link/parse', method: 'POST', data: { linkText }, showLoading: true }),
 
-  // 商品分析（PRD §11.2）
-  analysis: (platform, itemId, assets) =>
+  // 商品分析（PRD §11.2）。uid 透传用于拼多多比价预判（登录用户）
+  analysis: (platform, itemId, assets, uid) =>
     request({
       url: `/api/product/analysis?platform=${platform}&item_id=${itemId}&assets=${encodeURIComponent(
         JSON.stringify(assets || {}),
-      )}`,
+      )}${uid ? `&uid=${encodeURIComponent(uid)}` : ''}`,
       method: 'GET',
       auth: false,
     }),
+
+  // 拼多多用户备案（比价预判前置，需登录）
+  pddAuthorityStatus: () => request({ url: '/api/pdd/authority/status' }),
+  pddAuthorityBind: () => request({ url: '/api/pdd/authority/bind', method: 'POST' }),
 
   // 搜索
   search: (keyword) =>

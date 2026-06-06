@@ -59,7 +59,7 @@ zdsj:
         auto-failover: ${PDD_PROVIDER_AUTO_FAILOVER:true}
     # 维易 VEAPI（购买核心接口卡后填 vekey；secret 为空则不加签）
     veapi:
-      base-url: ${VEAPI_BASE_URL:https://api.veapi.cn}
+      base-url: ${VEAPI_BASE_URL:http://api.veapi.cn}
       vekey: ${VEAPI_VEKEY:}
       secret: ${VEAPI_SECRET:}
       jd:

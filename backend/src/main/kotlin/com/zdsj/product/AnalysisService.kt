@@ -2,6 +2,7 @@ package com.zdsj.product
 
 import com.zdsj.affiliate.AffiliateItem
 import com.zdsj.affiliate.Platform
+import com.zdsj.affiliate.ProductImageUrls
 import com.zdsj.affiliate.provider.AffiliateGateway
 import com.zdsj.ai.AiAnalysisService
 import com.zdsj.ai.AiInput
@@ -82,7 +83,7 @@ class AnalysisService(
     }
 
     /** GET /api/product/analysis —— 组装核心转化页所需全部数据 */
-    fun analyze(platformCode: String, itemId: String, assets: UserAssets): AnalysisResult {
+    fun analyze(platformCode: String, itemId: String, assets: UserAssets, userKey: String? = null): AnalysisResult {
         val platform = Platform.fromCode(platformCode)
             ?: throw BizException(ErrorCode.PLATFORM_UNSUPPORTED, "不支持的平台")
         val item = resolveAffiliateItem(platform, itemId)
@@ -123,7 +124,7 @@ class AnalysisService(
         )
 
         // 5. 跨平台同款对比
-        val cross = crossPlatform(platform, sku, item, assets)
+        val cross = crossPlatform(platform, sku, item, assets, userKey)
 
         return AnalysisResult(
             productInfo = productInfoMap(item) + mapOf("rawProductId" to raw.id),
@@ -137,7 +138,7 @@ class AnalysisService(
             riskInfo = riskTags,
             aiRecommendation = ai,
             crossPlatform = cross,
-            cpsLink = gateway.buildCpsLink(platform, itemId).data,
+            cpsLink = gateway.buildCpsLink(platform, itemId, userKey).data,
         )
     }
 
@@ -164,10 +165,13 @@ class AnalysisService(
         sku: com.zdsj.product.ProductSku?,
         selfItem: AffiliateItem,
         assets: UserAssets,
+        userKey: String? = null,
     ): List<Map<String, Any?>> {
+        // 召回词降维：剔除颜色/容量/版本，避免精准匹配原 SKU（合规导购方案 §3.1）
+        val keyword = sku?.let { "${it.brand} ${it.model}" }
+            ?: com.zdsj.affiliate.KeywordDegrader.degrade(selfItem.title)
+            ?: selfItem.title
         return Platform.entries.filter { it != self }.mapNotNull { other ->
-            // 用标准型号在其他平台搜同款（mock 下基于标题关键词）
-            val keyword = sku?.let { "${it.brand} ${it.model}" } ?: selfItem.title
             val candidate = gateway.search(other, keyword).data?.firstOrNull()
                 ?: return@mapNotNull null
             val price = priceEngine.compute(candidate, assets)
@@ -177,7 +181,7 @@ class AnalysisService(
                 "shopName" to candidate.shopName,
                 "shopType" to candidate.shopType,
                 "estimatedFinalPrice" to price.estimatedFinalPrice,
-                "cpsLink" to gateway.buildCpsLink(other, candidate.platformItemId).data,
+                "cpsLink" to gateway.buildCpsLink(other, candidate.platformItemId, userKey).data,
             )
         }
     }
@@ -213,13 +217,13 @@ class AnalysisService(
     }
 
     private fun needsAffiliateRefresh(item: AffiliateItem): Boolean =
-        item.rawPrice.compareTo(BigDecimal.ZERO) == 0 || item.imageUrl.isNullOrBlank()
+        item.rawPrice.compareTo(BigDecimal.ZERO) == 0 || !ProductImageUrls.isLoadable(item.imageUrl)
 
     private fun isRicherThanCached(fresh: AffiliateItem, cached: AffiliateItem): Boolean {
         val freshHasPrice = fresh.rawPrice.compareTo(BigDecimal.ZERO) > 0
         val cachedHasPrice = cached.rawPrice.compareTo(BigDecimal.ZERO) > 0
-        val freshHasImage = !fresh.imageUrl.isNullOrBlank()
-        val cachedHasImage = !cached.imageUrl.isNullOrBlank()
+        val freshHasImage = ProductImageUrls.isLoadable(fresh.imageUrl)
+        val cachedHasImage = ProductImageUrls.isLoadable(cached.imageUrl)
         return (freshHasPrice && !cachedHasPrice) ||
             (freshHasImage && !cachedHasImage) ||
             (freshHasPrice && freshHasImage)

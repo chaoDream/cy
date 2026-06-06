@@ -41,7 +41,7 @@ Page({
 
   useClipboard() {
     this.setData({ linkText: this.data.clipboardHint, clipboardHint: '' });
-    this.onParse();
+    this.onQuery();
   },
 
   dismissClipboard() {
@@ -56,12 +56,26 @@ Page({
     api.saveAssets(assets).catch(() => {});
   },
 
-  onParse() {
-    const linkText = (this.data.linkText || '').trim();
-    if (!linkText) {
-      wx.showToast({ title: '请粘贴京东或拼多多手机商品链接', icon: 'none' });
+  // 统一入口：粘贴链接走解析，普通文本走搜索；两条路最终都汇入差异化推荐
+  onQuery() {
+    const text = (this.data.linkText || '').trim();
+    if (!text) {
+      wx.showToast({ title: '粘贴链接或输入机型，如 iPhone 16 Pro', icon: 'none' });
       return;
     }
+    if (this._looksLikeLink(text)) {
+      this._parseLink(text);
+    } else {
+      this._search(text);
+    }
+  },
+
+  _looksLikeLink(text) {
+    return /https?:\/\//i.test(text) ||
+      /(jd\.com|3\.cn|u\.jd\.com|yangkeduo|pinduoduo|京东|拼多多)/i.test(text);
+  },
+
+  _parseLink(linkText) {
     track.event('link_parse_submit');
     api
       .parseLink(linkText)
@@ -76,14 +90,12 @@ Page({
       });
   },
 
-  onSearchInput(e) {
-    this.setData({ keyword: e.detail.value });
-  },
-
-  onSearch() {
-    const keyword = (this.data.keyword || '').trim();
-    if (!keyword) return;
-    api.search(keyword).then((list) => this.setData({ searchResults: list }));
+  _search(keyword) {
+    track.event('search_submit');
+    api
+      .search(keyword)
+      .then((list) => this.setData({ searchResults: list }))
+      .catch((err) => wx.showToast({ title: err.message || '搜索失败', icon: 'none' }));
   },
 
   onCardTap(e) {

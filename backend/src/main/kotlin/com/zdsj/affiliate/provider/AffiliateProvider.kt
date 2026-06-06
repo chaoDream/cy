@@ -15,6 +15,8 @@ data class AffiliateContext(
     val bypassCache: Boolean = false,
     val authMode: AuthMode = AuthMode.SELF,
     val traceId: String? = null,
+    /** 用户标识（拼多多 custom_parameters，用于比价预判 / 归因备案）；游客为 null */
+    val userKey: String? = null,
 )
 
 /**
