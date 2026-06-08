@@ -2,10 +2,15 @@ package com.zdsj.watch
 
 import com.zdsj.common.BizException
 import com.zdsj.common.ErrorCode
+import com.zdsj.price.PriceEngine
 import com.zdsj.price.PriceService
+import com.zdsj.price.UserAssets
+import com.zdsj.product.ProductIngestService
 import com.zdsj.product.ProductMappingRepository
+import com.zdsj.product.ProductRaw
 import com.zdsj.product.ProductRawRepository
 import com.zdsj.user.AppUserRepository
+import com.zdsj.user.UserService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
@@ -23,6 +28,9 @@ class WatchService(
     private val rawRepo: ProductRawRepository,
     private val mappingRepo: ProductMappingRepository,
     private val priceService: PriceService,
+    private val priceEngine: PriceEngine,
+    private val ingestService: ProductIngestService,
+    private val userService: UserService,
     private val userRepo: AppUserRepository,
 ) {
 
@@ -47,7 +55,8 @@ class WatchService(
         val raw = rawRepo.findById(rawProductId)
             .orElseThrow { BizException(ErrorCode.NOT_FOUND, "商品不存在") }
         val resolvedSkuId = skuId ?: mappingRepo.findByRawProductId(rawProductId).map { it.skuId }.orElse(null)
-        val currentPrice = raw.rawPrice ?: BigDecimal.ZERO
+        // 当前价存「到手价」而非挂牌价，与列表「当前到手价」语义一致；算不出时回退挂牌价
+        val currentPrice = estimateFinalPrice(userId, raw)
 
         // platform_lowest 需按 SKU 全平台搜索；无 SKU 时无召回词，自动回退为只盯当前商家
         val resolvedMode = normalizeMode(watchMode).takeUnless { it == MODE_PLATFORM_LOWEST && resolvedSkuId == null }
@@ -82,6 +91,15 @@ class WatchService(
 
     private fun normalizeMode(mode: String?): String =
         if (mode == MODE_PLATFORM_LOWEST) MODE_PLATFORM_LOWEST else MODE_MERCHANT
+
+    /** 按用户资产算当前到手价；挂牌价缺失或算出非正数时回退挂牌价 */
+    private fun estimateFinalPrice(userId: Long, raw: ProductRaw): BigDecimal {
+        val original = raw.rawPrice ?: BigDecimal.ZERO
+        if (original <= BigDecimal.ZERO) return original
+        val assets = UserAssets.from(userService.getProfile(userId).assetsJson)
+        val price = priceEngine.compute(ingestService.toAffiliateItem(raw), assets).estimatedFinalPrice
+        return if (price > BigDecimal.ZERO) price else original
+    }
 
     private fun defaultTarget(skuId: Long?, currentPrice: BigDecimal): BigDecimal {
         val low30 = skuId?.let { priceService.low30(it) }

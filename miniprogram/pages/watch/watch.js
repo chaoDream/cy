@@ -1,6 +1,7 @@
 const api = require('../../api/index');
 const track = require('../../utils/track');
 const { ensureLogin } = require('../../utils/auth');
+const { yuanTrim } = require('../../utils/format');
 
 Page({
   data: {
@@ -21,7 +22,16 @@ Page({
     this.setData({ loading: true, loadError: '' });
     return ensureLogin()
       .then(() => api.watchList())
-      .then((list) => this.setData({ list, loading: false, loadError: '' }))
+      .then((list) => this.setData({
+        list: (list || []).map((it) => ({
+          ...it,
+          originalPriceText: yuanTrim(it.originalPrice),
+          currentPriceText: yuanTrim(it.currentPrice),
+          targetPriceText: yuanTrim(it.targetPrice),
+        })),
+        loading: false,
+        loadError: '',
+      }))
       .catch((err) => {
         this.setData({
           loading: false,

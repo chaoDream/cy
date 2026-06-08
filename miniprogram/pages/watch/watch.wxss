@@ -34,18 +34,48 @@
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
-.wc-prices {
+.wc-meta {
   display: flex;
-  justify-content: space-between;
-  margin-top: 12rpx;
-  font-size: 24rpx;
-  color: #6b7280;
+  align-items: center;
+  gap: 14rpx;
+  margin-top: auto;
+  padding-top: 12rpx;
 }
-.wc-status { font-size: 22rpx; margin-top: 10rpx; }
-.wc-mode { font-size: 22rpx; color: #8a9099; margin-top: 6rpx; }
+.wc-status { font-size: 22rpx; }
+.wc-mode {
+  font-size: 20rpx;
+  color: #8a9099;
+  background: #f2f3f5;
+  border-radius: 6rpx;
+  padding: 2rpx 12rpx;
+}
 .status-watching { color: #34c759; }
 .status-hit { color: #fa3534; }
 .status-paused { color: #b0b4ba; }
+
+/* 三档价格：原价 / 当前到手价 / 目标价，等宽对齐 */
+.wc-prices {
+  display: flex;
+  margin-top: 20rpx;
+  padding: 18rpx 0;
+  background: #fafbfc;
+  border-radius: 14rpx;
+}
+.pc {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+}
+.pc + .pc { border-left: 2rpx solid #eef0f3; }
+.pc-label { font-size: 22rpx; color: #8a9099; }
+.pc-val { font-size: 30rpx; font-weight: 700; }
+.pc-val.origin { color: #b0b4ba; text-decoration: line-through; font-weight: 400; }
+.pc-val.now { color: #fa3534; }
+.pc-val.target { color: #1a73e8; }
+
+.wc-hit-tip { display: block; font-size: 22rpx; color: #fa3534; margin-top: 12rpx; }
 
 .wc-actions {
   display: flex;

@@ -98,8 +98,15 @@ class WatchPollingJob(
 
     /** 只盯当前商家这条链接 */
     private fun fetchMerchant(w: WatchItem, raw: ProductRaw, platform: Platform, assets: UserAssets): Quote? {
-        val item = gateway.fetchItem(platform, raw.platformItemId, bypassCache = true).data ?: return null
+        val result = gateway.fetchItem(platform, raw.platformItemId, bypassCache = true)
+        val item = result.data ?: return null
+        // 取价降级或拿到空价（rawPrice=0）时跳过，避免用脏数据把历史正确到手价覆盖成 0
+        if (result.degraded || item.rawPrice <= BigDecimal.ZERO) {
+            log.warn("盯价取价降级/空价，跳过更新 watchId={} platform={} item={}", w.id, platform.code, raw.platformItemId)
+            return null
+        }
         val priceResult = priceEngine.compute(item, assets)
+        if (priceResult.estimatedFinalPrice <= BigDecimal.ZERO) return null
         priceService.recordSnapshot(raw.id!!, w.skuId, platform.code, priceResult)
         return Quote(priceResult.estimatedFinalPrice, raw.platformItemId)
     }
@@ -110,10 +117,11 @@ class WatchPollingJob(
         val keyword = "${sku.brand} ${sku.model}".trim()
         if (keyword.isBlank()) return null
         val hits = gateway.search(platform, keyword, limit = 20).data ?: return null
-        // 用原商品标题过滤召回噪声，避免把不同型号/配件的低价误当同款最低
+        // 用原商品标题过滤召回噪声 + 剔除 0 价脏数据，避免把降级空价误当同款最低
         val best = hits
-            .filter { JdGoodsMatcher.matchesShareTitle(raw.title, it) }
+            .filter { it.rawPrice > BigDecimal.ZERO && JdGoodsMatcher.matchesShareTitle(raw.title, it) }
             .map { it to priceEngine.compute(it, assets) }
+            .filter { it.second.estimatedFinalPrice > BigDecimal.ZERO }
             .minByOrNull { it.second.estimatedFinalPrice }
             ?: return null
         priceService.recordSnapshot(raw.id!!, w.skuId, platform.code, best.second)

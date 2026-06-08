@@ -56,6 +56,7 @@ class WatchController(
                 "platformItemId" to raw?.platformItemId,
                 "title" to raw?.title,
                 "imageUrl" to raw?.imageUrl,
+                "originalPrice" to raw?.rawPrice,
                 "targetPrice" to it.targetPrice,
                 "currentPrice" to it.currentPrice,
                 "diffToTarget" to diff,
