@@ -11,6 +11,20 @@
 .price { color: #fa3534; font-weight: 700; }
 .target { color: #1a73e8; font-weight: 700; }
 
+/* 全局降价提醒开关 */
+.notify-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+}
+.nb-text { display: flex; flex-direction: column; gap: 6rpx; }
+.nb-title { font-size: 30rpx; font-weight: 700; color: #1f2329; }
+.nb-sub { font-size: 22rpx; color: #8a9099; }
+
 .watch-card {
   background: #fff;
   border-radius: 20rpx;

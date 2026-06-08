@@ -122,13 +122,17 @@ class WatchService(
         return watchRepo.save(w)
     }
 
+    /** 全局开关：一次性设置该用户所有盯价的提醒开关，返回受影响条数 */
     @Transactional
-    fun toggleNotify(userId: Long, watchId: Long, enabled: Boolean): WatchItem {
-        val w = watchRepo.findById(watchId).orElseThrow { BizException(ErrorCode.NOT_FOUND, "盯价不存在") }
-        if (w.userId != userId) throw BizException(ErrorCode.UNAUTHORIZED, "无权操作")
-        w.notifyEnabled = enabled
-        w.updatedAt = OffsetDateTime.now()
-        return watchRepo.save(w)
+    fun setNotifyAll(userId: Long, enabled: Boolean): Int {
+        val items = watchRepo.findByUserIdOrderByCreatedAtDesc(userId)
+        val now = OffsetDateTime.now()
+        items.forEach {
+            it.notifyEnabled = enabled
+            it.updatedAt = now
+        }
+        watchRepo.saveAll(items)
+        return items.size
     }
 
     @Transactional

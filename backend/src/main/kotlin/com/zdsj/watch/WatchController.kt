@@ -19,7 +19,7 @@ data class WatchCreateRequest(
 )
 
 data class TargetUpdateRequest(val watchId: Long = 0, val targetPrice: BigDecimal = BigDecimal.ZERO)
-data class NotifyToggleRequest(val watchId: Long = 0, val enabled: Boolean = true)
+data class NotifyAllRequest(val enabled: Boolean = true)
 data class WatchModeRequest(val watchId: Long = 0, val watchMode: String = MODE_MERCHANT)
 data class WatchRemoveRequest(val watchId: Long = 0)
 
@@ -74,10 +74,10 @@ class WatchController(
         return ApiResponse.ok(mapOf("watchId" to w.id, "targetPrice" to w.targetPrice))
     }
 
-    @PostMapping("/notify")
-    fun toggleNotify(request: HttpServletRequest, @RequestBody req: NotifyToggleRequest): ApiResponse<Map<String, Any?>> {
-        val w = watchService.toggleNotify(request.currentUserId(), req.watchId, req.enabled)
-        return ApiResponse.ok(mapOf("watchId" to w.id, "notifyEnabled" to w.notifyEnabled))
+    @PostMapping("/notify-all")
+    fun toggleNotifyAll(request: HttpServletRequest, @RequestBody req: NotifyAllRequest): ApiResponse<Map<String, Any?>> {
+        val updated = watchService.setNotifyAll(request.currentUserId(), req.enabled)
+        return ApiResponse.ok(mapOf("updated" to updated, "notifyEnabled" to req.enabled))
     }
 
     @PostMapping("/mode")

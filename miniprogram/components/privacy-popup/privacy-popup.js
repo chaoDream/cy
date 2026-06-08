@@ -1,23 +1,20 @@
-const PRIVACY_OK_KEY = '__clipboard_privacy_ok__';
+const { writeClipboard, markPrivacyAgreed, openCopyLinkPage } = require('../../utils/purchase');
 
 Component({
   data: {
     visible: false,
-    privacyContractName: '用户隐私保护指引',
   },
 
   lifetimes: {
     attached() {
+      this._link = '';
+      this._type = '';
       this._resolve = null;
-      if (typeof wx.getPrivacySetting === 'function') {
-        wx.getPrivacySetting({
-          success: (res) => {
-            if (res.privacyContractName) {
-              this.setData({ privacyContractName: res.privacyContractName });
-            }
-          },
-        });
+      const app = getApp();
+      if (app && app.globalData) {
+        app.globalData.privacyPopup = this;
       }
+      // 兜底：若某处直接调用了隐私 API 触发原生授权请求，也用本弹窗承接
       if (typeof wx.onNeedPrivacyAuthorization === 'function') {
         wx.onNeedPrivacyAuthorization((resolve) => {
           this._resolve = resolve;
@@ -25,41 +22,52 @@ Component({
         });
       }
     },
+    detached() {
+      const app = getApp();
+      if (app && app.globalData && app.globalData.privacyPopup === this) {
+        app.globalData.privacyPopup = null;
+      }
+    },
   },
 
   methods: {
     noop() {},
 
-    openContract() {
-      if (wx.openPrivacyContract) {
-        wx.openPrivacyContract({});
-      }
+    /** 由 purchase.js 主动调用：携带待复制链接弹出 */
+    show(link, linkType) {
+      this._link = link || '';
+      this._type = linkType || 'default';
+      this.setData({ visible: true });
     },
 
     onAgree() {
-      try {
-        wx.setStorageSync(PRIVACY_OK_KEY, '1');
-      } catch (e) {
-        // ignore
-      }
-      const app = getApp();
-      if (app && app.globalData) {
-        app.globalData.clipboardPrivacyOk = true;
-      }
+      markPrivacyAgreed();
+      this.setData({ visible: false });
+      // 原生挂起的请求（兜底分支）：放行后由原调用自动继续
       if (typeof this._resolve === 'function') {
         this._resolve({ event: 'agree', buttonId: 'pp-agree' });
         this._resolve = null;
+        return;
       }
-      this.setData({ visible: false });
+      // 主动弹窗分支：直接复制
+      if (this._link) {
+        writeClipboard(this._link, this._type);
+      }
     },
 
     onDisagree() {
+      this.setData({ visible: false });
       if (typeof this._resolve === 'function') {
         this._resolve({ event: 'disagree' });
         this._resolve = null;
       }
-      this.setData({ visible: false });
-      wx.showToast({ title: '未同意，无法复制链接', icon: 'none' });
+      const link = this._link;
+      const type = this._type;
+      if (link) {
+        openCopyLinkPage(link, '', type);
+      } else {
+        wx.showToast({ title: '未同意隐私协议', icon: 'none' });
+      }
     },
   },
 });

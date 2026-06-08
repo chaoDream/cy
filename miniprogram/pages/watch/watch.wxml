@@ -6,6 +6,14 @@
   <view wx:elif="{{!list.length}}" class="empty">还没有盯价商品，去查价页加一个吧</view>
 
   <block wx:else>
+    <view class="notify-bar">
+      <view class="nb-text">
+        <text class="nb-title">降价提醒</text>
+        <text class="nb-sub">关闭后，所有盯价都不再推送提醒</text>
+      </view>
+      <switch checked="{{notifyAll}}" color="#34c759" bindchange="onToggleNotifyAll" />
+    </view>
+
     <view class="watch-card" wx:for="{{list}}" wx:key="watchId">
       <view
         class="wc-top"
@@ -44,9 +52,6 @@
       <view class="wc-actions">
         <text class="wc-act" data-watchid="{{item.watchId}}" data-current="{{item.targetPrice}}" bindtap="onEditTarget">改目标价</text>
         <text class="wc-act" data-watchid="{{item.watchId}}" data-mode="{{item.watchMode}}" bindtap="onSwitchMode">切换范围</text>
-        <text class="wc-act" data-watchid="{{item.watchId}}" data-enabled="{{item.notifyEnabled}}" bindtap="onToggleNotify">
-          {{item.notifyEnabled ? '关提醒' : '开提醒'}}
-        </text>
         <text class="wc-act danger" data-watchid="{{item.watchId}}" bindtap="onRemove">取消</text>
       </view>
     </view>

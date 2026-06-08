@@ -2,7 +2,17 @@ const api = require('../../../api/index');
 const track = require('../../../utils/track');
 const { ensureLogin, getUserId } = require('../../../utils/auth');
 const { subscribeTemplateId } = require('../../../utils/config');
-const { platformName, shopTypeName, yuan } = require('../../../utils/format');
+const { platformName, shopTypeName, yuan, yuanTrim } = require('../../../utils/format');
+
+/** 价格输入清洗：仅留数字与一个小数点，最多两位小数 */
+function sanitizeMoney(v) {
+  let s = String(v).replace(/[^\d.]/g, '');
+  const dot = s.indexOf('.');
+  if (dot >= 0) {
+    s = s.slice(0, dot + 1) + s.slice(dot + 1).replace(/\./g, '').slice(0, 2);
+  }
+  return s;
+}
 const { prepareImageForDisplay } = require('../../../utils/image');
 const { copyPurchaseLink } = require('../../../utils/purchase');
 
@@ -20,6 +30,8 @@ Page({
     crossView: [],
     // 同款是否可直接购买（拼多多比价预判命中时为 false，引导看更优选择）
     sameItemBuyable: true,
+    // 盯价弹窗状态
+    watchModal: { show: false },
   },
 
   onLoad(query) {
@@ -77,43 +89,115 @@ Page({
     track.event('risk_detail_view');
   },
 
-  // 盯价：需登录 + 选择盯价范围 + 申请订阅消息授权（PRD §5.5）
+  // 盯价：需登录后弹出盯价弹窗（PRD §5.5）
   onWatch() {
     ensureLogin()
-      .then(() => this._chooseWatchMode())
-      .then((watchMode) => this._requestSubscribe().then(() => watchMode))
-      .then((watchMode) => {
+      .then(() => {
+        const info = this.data.data && this.data.data.priceInfo;
+        const current = Number(info && info.estimatedFinalPrice);
+        if (!current || current <= 0) {
+          wx.showToast({ title: '当前价格获取中，请稍后再试', icon: 'none' });
+          return;
+        }
+        this.setData({ watchModal: this._buildWatchModal(current) });
+      })
+      .catch((err) => {
+        if (err && err.needLogin) wx.showToast({ title: '请先登录', icon: 'none' });
+      });
+  },
+
+  // 构造弹窗初始态：默认选中「降价5%」，输入框无焦点
+  _buildWatchModal(current) {
+    const mk = (pct) => {
+      const price = Math.round(current * (1 - pct / 100) * 100) / 100;
+      return { pct, price, priceText: yuanTrim(price) };
+    };
+    return {
+      show: true,
+      currentPrice: current,
+      currentPriceText: yuanTrim(current),
+      options: [mk(5), mk(10), mk(20)],
+      selectedPct: 5,
+      customPrice: '',
+      inputFocus: false,
+      inputError: false,
+      scope: 'merchant',
+      canSubmit: true,
+    };
+  },
+
+  // 点击降价档位：选中它、清空输入框、收起键盘
+  onPickPct(e) {
+    const pct = Number(e.currentTarget.dataset.pct);
+    this.setData({
+      'watchModal.selectedPct': pct,
+      'watchModal.customPrice': '',
+      'watchModal.inputFocus': false,
+      'watchModal.inputError': false,
+      'watchModal.canSubmit': true,
+    });
+  },
+
+  // 输入框获取焦点：取消所有档位选中
+  onCustomFocus() {
+    this.setData({
+      'watchModal.selectedPct': null,
+      'watchModal.inputFocus': true,
+    });
+  },
+
+  // 输入价格：限制两位小数，超过当前价则报错并禁用提交
+  onCustomInput(e) {
+    const val = sanitizeMoney(e.detail.value);
+    const num = Number(val);
+    const current = this.data.watchModal.currentPrice;
+    const over = val !== '' && num > current;
+    const valid = val !== '' && num > 0 && num <= current;
+    this.setData({
+      'watchModal.selectedPct': null,
+      'watchModal.customPrice': val,
+      'watchModal.inputError': over,
+      'watchModal.canSubmit': valid,
+    });
+    return val; // 受控输入，强制清洗后的值
+  },
+
+  onPickScope(e) {
+    this.setData({ 'watchModal.scope': e.currentTarget.dataset.scope });
+  },
+
+  onCloseWatchModal() {
+    this.setData({ 'watchModal.show': false });
+  },
+
+  noop() {},
+
+  // 提交盯价：目标价必须 > 0 且不超过当前价
+  onConfirmWatch() {
+    const wm = this.data.watchModal;
+    if (!wm.canSubmit) return;
+    const target = wm.selectedPct != null
+      ? wm.options.find((o) => o.pct === wm.selectedPct).price
+      : Number(wm.customPrice);
+    if (!(target > 0) || target > wm.currentPrice) return;
+    const scope = wm.scope;
+    this.setData({ 'watchModal.show': false });
+    this._requestSubscribe()
+      .then(() => {
         const d = this.data.data;
         return api.createWatch({
           rawProductId: d.productInfo.rawProductId || d.rawProductId,
-          targetPrice: null, // 由后端默认目标价规则计算
-          watchMode,
+          targetPrice: target,
+          watchMode: scope,
         });
       })
       .then((res) => {
         track.event('watch_create');
-        const scope = res.watchMode === 'platform_lowest' ? '全平台同款最低价' : '当前商家';
-        wx.showToast({ title: `已盯${scope}，目标价 ¥${res.targetPrice}`, icon: 'none' });
+        wx.showToast({ title: `已盯价，目标价 ¥${yuanTrim(res.targetPrice)}`, icon: 'none' });
       })
       .catch((err) => {
-        if (err && err.cancelled) return; // 用户取消选择，不提示
-        if (err && err.needLogin) {
-          wx.showToast({ title: '请先登录', icon: 'none' });
-        } else {
-          wx.showToast({ title: (err && err.message) || '盯价失败', icon: 'none' });
-        }
+        wx.showToast({ title: (err && err.message) || '盯价失败', icon: 'none' });
       });
-  },
-
-  // 选择盯价范围：默认只盯当前商家这条链接
-  _chooseWatchMode() {
-    return new Promise((resolve, reject) => {
-      wx.showActionSheet({
-        itemList: ['只盯当前商家这个价', '盯全平台同款最低价'],
-        success: (res) => resolve(res.tapIndex === 1 ? 'platform_lowest' : 'merchant'),
-        fail: () => reject({ cancelled: true }),
-      });
-    });
   },
 
   _requestSubscribe() {

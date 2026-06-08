@@ -119,3 +119,113 @@
 }
 .action-watch { flex: 1; }
 .action-buy { flex: 1.4; }
+
+/* ============ 盯价弹窗 ============ */
+.wm-mask {
+  position: fixed;
+  left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-end;
+  z-index: 1000;
+}
+.wm-panel {
+  width: 100%;
+  background: #fff;
+  border-radius: 28rpx 28rpx 0 0;
+  padding: 32rpx 32rpx calc(32rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+.wm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24rpx;
+}
+.wm-title { font-size: 32rpx; font-weight: 700; color: #1f2329; }
+.wm-close { font-size: 32rpx; color: #b0b4ba; padding: 0 10rpx; }
+
+.wm-current {
+  display: flex;
+  align-items: baseline;
+  gap: 16rpx;
+  margin-bottom: 24rpx;
+}
+.wm-current-label { font-size: 26rpx; color: #6b7280; }
+.wm-current-price { font-size: 40rpx; font-weight: 700; color: #1f2329; }
+
+/* 三个降价档位 */
+.wm-opts { display: flex; gap: 18rpx; margin-bottom: 24rpx; }
+.wm-opt {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+  padding: 18rpx 0;
+  border: 2rpx solid #e5e7eb;
+  border-radius: 16rpx;
+  background: #fff;
+}
+.wm-opt.active {
+  border-color: #fa3534;
+  background: #fff5f5;
+}
+.wm-opt-pct { font-size: 26rpx; color: #1f2329; }
+.wm-opt.active .wm-opt-pct { color: #fa3534; font-weight: 700; }
+.wm-opt-price { font-size: 24rpx; color: #8a9099; }
+.wm-opt.active .wm-opt-price { color: #fa3534; }
+
+/* 自定义输入 */
+.wm-input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 88rpx;
+  padding: 0 24rpx;
+  border: 2rpx solid #e5e7eb;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  color: #1f2329;
+}
+.wm-input.error { border-color: #fa3534; }
+.wm-input-ph { color: #b0b4ba; }
+.wm-hint {
+  display: block;
+  font-size: 22rpx;
+  color: #8a9099;
+  margin: 12rpx 4rpx 0;
+}
+.wm-hint.error { color: #fa3534; }
+
+/* 盯价范围 */
+.wm-scope { margin-top: 28rpx; }
+.wm-scope-label { font-size: 26rpx; color: #6b7280; }
+.wm-scope-opts { display: flex; gap: 18rpx; margin-top: 14rpx; }
+.wm-scope-opt {
+  flex: 1;
+  text-align: center;
+  padding: 18rpx 0;
+  font-size: 26rpx;
+  color: #1f2329;
+  border: 2rpx solid #e5e7eb;
+  border-radius: 16rpx;
+}
+.wm-scope-opt.active {
+  border-color: #1a73e8;
+  background: #eef4ff;
+  color: #1a73e8;
+  font-weight: 700;
+}
+
+/* 提交 */
+.wm-submit {
+  margin-top: 32rpx;
+  background: #fa3534;
+  color: #fff;
+  font-size: 30rpx;
+  border-radius: 44rpx;
+}
+.wm-submit[disabled] {
+  background: #d9dbe0;
+  color: #fff;
+}

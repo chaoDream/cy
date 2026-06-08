@@ -28,8 +28,8 @@ module.exports = {
   watchList: () => request({ url: '/api/watch/list' }),
   updateTarget: (watchId, targetPrice) =>
     request({ url: '/api/watch/target', method: 'POST', data: { watchId, targetPrice } }),
-  toggleNotify: (watchId, enabled) =>
-    request({ url: '/api/watch/notify', method: 'POST', data: { watchId, enabled } }),
+  setNotifyAll: (enabled) =>
+    request({ url: '/api/watch/notify-all', method: 'POST', data: { enabled } }),
   updateWatchMode: (watchId, watchMode) =>
     request({ url: '/api/watch/mode', method: 'POST', data: { watchId, watchMode } }),
   removeWatch: (watchId) => request({ url: '/api/watch/remove', method: 'POST', data: { watchId } }),

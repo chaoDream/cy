@@ -98,5 +98,65 @@
     bindtap="onBuy"
   >{{sameItemBuyable ? '去购买' : '看更优选择'}}</button>
 </view>
+<!-- 盯价弹窗 -->
+<view wx:if="{{watchModal.show}}" class="wm-mask" bindtap="onCloseWatchModal">
+  <view class="wm-panel" catchtap="noop">
+    <view class="wm-header">
+      <text class="wm-title">设置盯价</text>
+      <text class="wm-close" catchtap="onCloseWatchModal">✕</text>
+    </view>
+
+    <view class="wm-current">
+      <text class="wm-current-label">当前价格</text>
+      <text class="wm-current-price">¥{{watchModal.currentPriceText}}</text>
+    </view>
+
+    <view class="wm-opts">
+      <view
+        wx:for="{{watchModal.options}}"
+        wx:key="pct"
+        class="wm-opt {{watchModal.selectedPct === item.pct ? 'active' : ''}}"
+        data-pct="{{item.pct}}"
+        catchtap="onPickPct"
+      >
+        <text class="wm-opt-pct">降价{{item.pct}}%</text>
+        <text class="wm-opt-price">¥{{item.priceText}}</text>
+      </view>
+    </view>
+
+    <input
+      class="wm-input {{watchModal.inputError ? 'error' : ''}}"
+      type="digit"
+      value="{{watchModal.customPrice}}"
+      focus="{{watchModal.inputFocus}}"
+      placeholder="请输入您想要的价格"
+      placeholder-class="wm-input-ph"
+      bindfocus="onCustomFocus"
+      bindinput="onCustomInput"
+    />
+    <text class="wm-hint {{watchModal.inputError ? 'error' : ''}}">
+      {{watchModal.inputError ? '当前价格就是你想要的价格，直接去购买吧' : '如果达到价格我们将会给您发送提示信息，请注意查收'}}
+    </text>
+
+    <view class="wm-scope">
+      <text class="wm-scope-label">盯价范围</text>
+      <view class="wm-scope-opts">
+        <view
+          class="wm-scope-opt {{watchModal.scope === 'merchant' ? 'active' : ''}}"
+          data-scope="merchant"
+          catchtap="onPickScope"
+        >只盯当前商家这个价</view>
+        <view
+          class="wm-scope-opt {{watchModal.scope === 'platform_lowest' ? 'active' : ''}}"
+          data-scope="platform_lowest"
+          catchtap="onPickScope"
+        >盯全平台同款最低价</view>
+      </view>
+    </view>
+
+    <button class="wm-submit" disabled="{{!watchModal.canSubmit}}" catchtap="onConfirmWatch">开始盯价</button>
+  </view>
+</view>
+
 <privacy-popup></privacy-popup>
 </view>

@@ -11,6 +11,7 @@ App({
       govSubsidyRegion: '',
     },
     clipboardPrivacyOk: false,
+    pendingPurchase: null,
   },
 
   onLaunch() {
@@ -18,7 +19,13 @@ App({
     if (cachedAssets) {
       this.globalData.assets = Object.assign(this.globalData.assets, cachedAssets);
     }
-    this.globalData.clipboardPrivacyOk = !!wx.getStorageSync('__clipboard_privacy_ok__');
+    // 清掉历史遗留的剪贴板授权假标记：授权状态以微信 getPrivacySetting 为准
+    try {
+      wx.removeStorageSync('__clipboard_privacy_ok__');
+    } catch (e) {
+      // ignore
+    }
+    this.globalData.clipboardPrivacyOk = false;
     restoreLogin().catch(() => {});
     track.event('app_open');
   },

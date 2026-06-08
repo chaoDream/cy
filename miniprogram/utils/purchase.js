@@ -1,9 +1,11 @@
 /**
- * 复制购买链接。
+ * 复制购买链接 + 隐私授权编排。
  *
- * 隐私：采用微信官方 onNeedPrivacyAuthorization 流程（见 components/privacy-popup）。
- * 直接调用 wx.setClipboardData：未授权时微信会触发全局隐私弹窗，用户在弹窗内点
- * 「同意并继续」后，本次 setClipboardData 会自动继续执行并写入剪贴板，无需跳页或重试。
+ * 流程：
+ * 1. 已授权（本地标记或 getPrivacySetting=已同意）→ 直接写剪贴板。
+ * 2. 未授权 → 主动弹出自定义隐私弹窗（privacy-popup 组件）：
+ *    - 同意 → agreePrivacyAuthorization 授权后写剪贴板。
+ *    - 不同意 → 跳转复制购买链接页面。
  */
 
 const PRIVACY_OK_KEY = '__clipboard_privacy_ok__';
@@ -59,16 +61,8 @@ function parseCopyError(err) {
   return { type: 'other', text: (err && err.errMsg) || '复制失败' };
 }
 
-/**
- * 复制购买链接。隐私授权由全局 privacy-popup 组件自动处理。
- * @param {string} link
- * @param {string} [linkType]
- */
-function copyPurchaseLink(link, linkType) {
-  if (!link) {
-    wx.showToast({ title: '暂无购买链接', icon: 'none' });
-    return;
-  }
+/** 真正写剪贴板（调用方需已确保隐私已授权） */
+function writeClipboard(link, linkType) {
   const type = linkType || 'default';
   wx.setClipboardData({
     data: link,
@@ -78,7 +72,6 @@ function copyPurchaseLink(link, linkType) {
     },
     fail: (err) => {
       const parsed = parseCopyError(err);
-      // 用户在隐私弹窗点了「拒绝」，或其它失败：给出查看链接的兜底
       wx.showModal({
         title: '未能复制',
         content: parsed.type === 'privacy' ? '需同意隐私协议后才能复制购买链接。' : parsed.text,
@@ -90,6 +83,51 @@ function copyPurchaseLink(link, linkType) {
       });
     },
   });
+}
+
+function showPrivacyPopup(link, linkType) {
+  const app = getApp();
+  const popup = app && app.globalData && app.globalData.privacyPopup;
+  if (popup && typeof popup.show === 'function') {
+    popup.show(link, linkType);
+  } else {
+    // 兜底：没有挂载弹窗组件时直接进复制链接页
+    openCopyLinkPage(link, '', linkType);
+  }
+}
+
+/**
+ * 复制购买链接，自动处理隐私授权。
+ * @param {string} link
+ * @param {string} [linkType]
+ */
+function copyPurchaseLink(link, linkType) {
+  if (!link) {
+    wx.showToast({ title: '暂无购买链接', icon: 'none' });
+    return;
+  }
+  const type = linkType || 'default';
+  const app = getApp();
+  if (app && app.globalData) {
+    app.globalData.pendingPurchase = { link, linkType: type };
+  }
+  // 权威判断只信 getPrivacySetting，不信本地标记（本地标记可能与微信端实际授权状态不一致）
+  if (typeof wx.getPrivacySetting === 'function') {
+    wx.getPrivacySetting({
+      success: (res) => {
+        if (res.needAuthorization) {
+          showPrivacyPopup(link, type);
+        } else {
+          markPrivacyAgreed();
+          writeClipboard(link, type);
+        }
+      },
+      // 取不到隐私状态：保守起见也弹授权弹窗，避免直接失败
+      fail: () => showPrivacyPopup(link, type),
+    });
+  } else {
+    writeClipboard(link, type);
+  }
 }
 
 function copyLinkDirect(link) {
@@ -113,6 +151,7 @@ function copyLinkDirect(link) {
 module.exports = {
   copyPurchaseLink,
   copyLinkDirect,
+  writeClipboard,
   markPrivacyAgreed,
   openCopyLinkPage,
   parseCopyError,
