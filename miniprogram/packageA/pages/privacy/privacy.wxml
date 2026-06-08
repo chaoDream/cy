@@ -11,7 +11,18 @@
     <view class="card-title">信息如何使用</view>
     <text class="p">省钱资产仅用于本地与服务端计算个人专属到手价；openid 仅用于登录与降价订阅消息下发。</text>
   </view>
+  <view class="card highlight" wx:if="{{fromPurchase}}">
+    <view class="card-title">完成购买前需一步授权</view>
+    <text class="p">请点击下方蓝色按钮「同意并复制购买链接」。同意后会自动复制链接并返回分析页。</text>
+  </view>
   <view class="card">
+    <view class="card-title">隐私授权</view>
+    <text class="p">复制购买链接需使用剪贴板，请点击下方按钮同意《用户隐私保护指引》。</text>
+    <button
+      class="btn-primary agree-btn"
+      open-type="agreePrivacyAuthorization"
+      bindagreeprivacyauthorization="onAgreePrivacy"
+    >{{fromPurchase ? '同意并复制购买链接' : '同意隐私协议（用于复制链接）'}}</button>
     <button class="btn-ghost" bindtap="openOfficialPrivacy">查看完整《隐私保护指引》</button>
   </view>
   <text class="muted foot">完整《用户协议》《隐私政策》以小程序后台备案版本为准。</text>

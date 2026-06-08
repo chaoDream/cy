@@ -23,12 +23,20 @@ class MockProvider : AffiliateProvider {
         Platform.PDD -> PddLinkParser.extractItemId(linkText)
     }
 
-    override fun fetchItem(ctx: AffiliateContext, itemId: String): AffiliateItem =
-        MockCatalog.toItem(ctx.platform, itemId, MockCatalog.byItemId(itemId))
+    override fun fetchItem(ctx: AffiliateContext, itemId: String): AffiliateItem? {
+        val seed = MockCatalog.matchByKeyword(itemId) ?: MockCatalog.byItemIdOrNull(itemId)
+        if (seed != null) return MockCatalog.toItem(ctx.platform, itemId, seed)
+        // 未知 SKU：返回占位商品，不再按 hash 随机落到 iPhone
+        return MockCatalog.toItem(ctx.platform, itemId, MockCatalog.genericSeed(itemId))
+    }
 
     override fun fetchFromShareText(linkText: String): AffiliateItem? {
         val (platform, id) = detect(linkText) ?: return null
-        return MockCatalog.toItem(platform, id, MockCatalog.byItemId(id))
+        val shareTitle = JdLinkParser.extractShareTitle(linkText) ?: PddLinkParser.extractShareTitle(linkText)
+        val seed = shareTitle?.let { MockCatalog.matchByKeyword(it) }
+            ?: MockCatalog.byItemIdOrNull(id)
+            ?: return null
+        return MockCatalog.toItem(platform, id, seed)
     }
 
     override fun search(ctx: AffiliateContext, keyword: String, limit: Int): List<AffiliateItem> {
@@ -36,8 +44,14 @@ class MockProvider : AffiliateProvider {
         return listOf(MockCatalog.toItem(ctx.platform, "${ctx.platform.code}_${seed.keyword}", seed))
     }
 
-    override fun buildCpsLink(ctx: AffiliateContext, itemId: String): String =
-        "https://${ctx.platform.code}.example.com/cps/$itemId?pid=mock"
+    override fun buildCpsLink(ctx: AffiliateContext, itemId: String): String? = when (ctx.platform) {
+        Platform.JD -> if (itemId.all { it.isDigit() }) {
+            "https://item.jd.com/$itemId.html"
+        } else {
+            null
+        }
+        Platform.PDD -> null
+    }
 
     private fun detect(linkText: String): Pair<Platform, String>? {
         JdLinkParser.extractItemId(linkText)?.let { return Platform.JD to it }

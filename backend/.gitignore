@@ -6,4 +6,5 @@ build/
 *.iml
 .DS_Store
 application-local.yml
+price-seeds.yml
 data/

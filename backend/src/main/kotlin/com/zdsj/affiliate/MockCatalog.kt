@@ -24,20 +24,44 @@ object MockCatalog {
         Seed("iphone16pro", "Apple iPhone 16 Pro 256GB 原色钛金属 国行 5G", "Apple", "iPhone 16 Pro", "256GB", "原色钛金属", 8999),
         Seed("iphone16", "Apple iPhone 16 128GB 群青色 国行", "Apple", "iPhone 16", "128GB", "群青色", 5999),
         Seed("mate70pro", "华为 Mate 70 Pro 256GB 雪域白 国行", "华为", "Mate 70 Pro", "256GB", "雪域白", 6499),
+        Seed("xiaomi17promax", "小米17 Pro Max 16+512GB 5G手机 国行", "小米", "17 Pro Max", "512GB", "黑色", 5999),
         Seed("xiaomi15", "小米 15 Pro 512GB 黑色 国行", "小米", "15 Pro", "512GB", "黑色", 5299),
         Seed("vivox200", "vivo X200 Pro 16+512GB 蔡司影像 国行", "vivo", "X200 Pro", "512GB", "钛色", 5999),
     )
 
     fun matchByKeyword(keyword: String): Seed? {
         val k = keyword.lowercase().replace(" ", "")
-        return seeds.firstOrNull { k.contains(it.keyword) || it.title.contains(keyword) }
-            ?: seeds.firstOrNull()
+        // 长关键词优先，避免「小米17」误命中「小米15」
+        return seeds
+            .sortedByDescending { it.keyword.length }
+            .firstOrNull { seed ->
+                k.contains(seed.keyword) ||
+                    seed.keyword.contains(k) ||
+                    seed.title.contains(keyword, ignoreCase = true) ||
+                    keyword.contains(seed.brand, ignoreCase = true) && k.contains(seed.model.lowercase().replace(" ", ""))
+            }
     }
 
-    fun byItemId(itemId: String): Seed {
-        val idx = abs(itemId.hashCode()) % seeds.size
-        return seeds[idx]
+    fun byItemId(itemId: String): Seed = byItemIdOrNull(itemId) ?: seeds.first()
+
+    /** 无关键词命中时不瞎猜，避免短链 hash 落到 iPhone */
+    fun byItemIdOrNull(itemId: String): Seed? {
+        matchByKeyword(itemId)?.let { return it }
+        if (itemId.startsWith("jd_") || itemId.startsWith("pdd_")) {
+            return matchByKeyword(itemId.removePrefix("jd_").removePrefix("pdd_"))
+        }
+        return null
     }
+
+    fun genericSeed(itemId: String): Seed = Seed(
+        keyword = "generic",
+        title = "Mock商品 $itemId",
+        brand = "Mock",
+        model = itemId,
+        storage = "",
+        color = "",
+        basePrice = 0,
+    )
 
     /** 不同平台对同一 seed 生成略有差异的报价 + 优惠，模拟真实比价场景 */
     fun toItem(platform: Platform, itemId: String, seed: Seed): AffiliateItem {

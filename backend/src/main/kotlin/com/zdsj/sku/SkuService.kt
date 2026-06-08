@@ -64,7 +64,7 @@ class SkuService(
             if (condition == "翻新/二手") add("疑似翻新二手")
             if (packageType == "套装") add("套装不可直接比价")
             if (unsealedWords.any { title.contains(it) }) add("售后不确定")
-            if (brand == null || model == null) add("规格不全")
+            if (brand == null || model == null) add("暂不在标准型号库")
         }
 
         val confidence = when {
@@ -90,7 +90,7 @@ class SkuService(
         val patterns = listOf(
             Regex("""iPhone\s?\d+\s?(Pro\s?Max|Pro|Plus)?""", RegexOption.IGNORE_CASE),
             Regex("""Mate\s?\d+\s?(Pro\+?|RS)?""", RegexOption.IGNORE_CASE),
-            Regex("""(小米|Xiaomi)\s?\d+\s?(Ultra|Pro)?""", RegexOption.IGNORE_CASE),
+            Regex("""(小米|Xiaomi)\s?\d+\s?(Pro\s?Max|Pro|Ultra|MAX)?""", RegexOption.IGNORE_CASE),
             Regex("""X\d{3}\s?(Pro\+?|Ultra)?""", RegexOption.IGNORE_CASE),
         )
         return patterns.firstNotNullOfOrNull { it.find(title)?.value?.trim() }

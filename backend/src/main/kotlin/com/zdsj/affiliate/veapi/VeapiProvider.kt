@@ -2,9 +2,12 @@ package com.zdsj.affiliate.veapi
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.zdsj.affiliate.AffiliateItem
+import com.zdsj.affiliate.JdGoodsMatcher
 import com.zdsj.affiliate.JdLinkParser
+import com.zdsj.affiliate.KeywordDegrader
 import com.zdsj.affiliate.PddLinkParser
 import com.zdsj.affiliate.Platform
+import com.zdsj.affiliate.jd.JdUnionClient
 import com.zdsj.affiliate.provider.AffiliateContext
 import com.zdsj.affiliate.provider.AffiliateProvider
 import com.zdsj.affiliate.provider.AuthMode
@@ -20,6 +23,7 @@ class VeapiProvider(
     private val client: VeapiClient,
     private val mapper: VeapiMapper,
     private val props: AffiliateProperties,
+    private val jdUnionClient: JdUnionClient,
 ) : AffiliateProvider {
 
     private val veapi get() = props.veapi
@@ -52,19 +56,65 @@ class VeapiProvider(
         else -> null
     }
 
-    /** 京东分享：数字 SKU 直查；短链/口令用 URL 或标题走搜索补全 */
+    /**
+     * 京东分享解析顺序：
+     * 1. 文案内数字 SKU 直查
+     * 2. 短链 HTTP 跳转 / 转链解析 SKU
+     * 3. 「」分享标题搜索并匹配（禁止用 URL 当关键词，否则会搜出无关商品）
+     */
     private fun fetchJdFromShare(linkText: String): AffiliateItem? {
-        val numericId = JdLinkParser.extractItemId(linkText)?.takeIf { it.all { c -> c.isDigit() } }
-        if (numericId != null) fetchJdItem(numericId)?.let { return it }
+        val shareUrl = JdLinkParser.extractUrl(linkText)
+        val shareTitle = JdLinkParser.extractShareTitle(linkText)
 
-        val url = JdLinkParser.extractUrl(linkText)
-        if (url != null) {
-            jdSearch(url, 1).firstOrNull()?.let { return it }
+        JdLinkParser.extractItemId(linkText)?.takeIf { it.all(Char::isDigit) }?.let { sku ->
+            fetchJdItem(sku)?.let { return attachShareMeta(it, shareUrl, shareTitle) }
         }
-        JdLinkParser.extractShareTitle(linkText)?.let { title ->
-            jdSearch(title, 1).firstOrNull()?.let { return it }
+
+        if (shareUrl != null) {
+            resolveSkuFromShortUrl(shareUrl)?.let { sku ->
+                fetchJdItem(sku)?.let { return attachShareMeta(it, shareUrl, shareTitle) }
+            }
+        }
+
+        if (!shareTitle.isNullOrBlank()) {
+            searchByShareTitle(shareTitle, shareUrl)?.let { return it }
         }
         return null
+    }
+
+    private fun resolveSkuFromShortUrl(url: String): String? {
+        JdLinkParser.extractItemIdFromUrl(url)?.let { return it }
+        jdUnionClient.resolveSkuIdFromUrl(url)?.let { return it }
+        val data = client.get(
+            "/jd/prombysubuid",
+            mapOf("materialId" to url, "sceneId" to "1"),
+        ) ?: return null
+        data.path("skuId").asText(null)?.takeIf { it.all(Char::isDigit) }?.let { return it }
+        val clickUrl = data.path("clickURL").asText(null) ?: data.path("shortURL").asText(null)
+        if (clickUrl != null) {
+            JdLinkParser.extractItemIdFromUrl(clickUrl)?.let { return it }
+            jdUnionClient.resolveSkuIdFromUrl(clickUrl)?.let { return it }
+        }
+        return null
+    }
+
+    private fun searchByShareTitle(shareTitle: String, shareUrl: String?): AffiliateItem? {
+        val queries = listOfNotNull(shareTitle, KeywordDegrader.degrade(shareTitle)).distinct()
+        for (keyword in queries) {
+            val picked = JdGoodsMatcher.pickBest(shareTitle, jdSearch(keyword, 8)) ?: continue
+            if (!JdGoodsMatcher.matchesShareTitle(shareTitle, picked)) continue
+            return attachShareMeta(picked, shareUrl, shareTitle)
+        }
+        return null
+    }
+
+    private fun attachShareMeta(item: AffiliateItem, shareUrl: String?, shareTitle: String?): AffiliateItem {
+        val meta = item.couponInfo.toMutableMap()
+        if (!shareTitle.isNullOrBlank()) meta["_shareTitle"] = shareTitle
+        return item.copy(
+            sourceUrl = shareUrl ?: item.sourceUrl,
+            couponInfo = meta,
+        )
     }
 
     override fun search(ctx: AffiliateContext, keyword: String, limit: Int): List<AffiliateItem> = when (ctx.platform) {

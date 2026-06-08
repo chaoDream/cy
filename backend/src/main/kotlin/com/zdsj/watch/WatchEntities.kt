@@ -20,6 +20,8 @@ class WatchItem(
     @Column(name = "current_price") var currentPrice: BigDecimal? = null,
     @Column(name = "notify_enabled") var notifyEnabled: Boolean = true,
     @Column(name = "poll_tier") var pollTier: String = "user",
+    // merchant=只盯当前商家这条链接；platform_lowest=盯该平台同款所有商家的最低价
+    @Column(name = "watch_mode") var watchMode: String = "merchant",
     var status: String = "watching",
     @Column(name = "created_at") var createdAt: OffsetDateTime = OffsetDateTime.now(),
     @Column(name = "updated_at") var updatedAt: OffsetDateTime = OffsetDateTime.now(),

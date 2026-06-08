@@ -23,10 +23,12 @@
           <text class="wc-status status-{{item.status}}">
             {{item.status === 'hit' ? '已达目标价，请重新订阅以继续提醒' : (item.status === 'paused' ? '已暂停' : '盯价中')}}
           </text>
+          <text class="wc-mode">范围：{{item.watchMode === 'platform_lowest' ? '全平台同款最低价' : '当前商家'}}</text>
         </view>
       </view>
       <view class="wc-actions">
         <text class="wc-act" data-watchid="{{item.watchId}}" data-current="{{item.targetPrice}}" bindtap="onEditTarget">改目标价</text>
+        <text class="wc-act" data-watchid="{{item.watchId}}" data-mode="{{item.watchMode}}" bindtap="onSwitchMode">切换范围</text>
         <text class="wc-act" data-watchid="{{item.watchId}}" data-enabled="{{item.notifyEnabled}}" bindtap="onToggleNotify">
           {{item.notifyEnabled ? '关提醒' : '开提醒'}}
         </text>

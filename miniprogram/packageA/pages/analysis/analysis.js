@@ -2,7 +2,9 @@ const api = require('../../../api/index');
 const track = require('../../../utils/track');
 const { ensureLogin, getUserId } = require('../../../utils/auth');
 const { subscribeTemplateId } = require('../../../utils/config');
-const { platformName, shopTypeName, yuan, resolveImageUrl } = require('../../../utils/format');
+const { platformName, shopTypeName, yuan } = require('../../../utils/format');
+const { prepareImageForDisplay } = require('../../../utils/image');
+const { copyPurchaseLink } = require('../../../utils/purchase');
 
 const app = getApp();
 
@@ -30,9 +32,9 @@ Page({
     this.setData({ loading: true, error: '' });
     api
       .analysis(this.data.platform, this.data.itemId, app.getAssets(), getUserId())
-      .then((res) => {
+      .then((res) => prepareImageForDisplay(res.productInfo && res.productInfo.imageUrl).then((img) => {
         if (res.productInfo) {
-          res.productInfo.imageUrl = resolveImageUrl(res.productInfo.imageUrl);
+          res.productInfo.imageUrl = img;
         }
         const crossView = (res.crossPlatform || []).map((c) => ({
           ...c,
@@ -40,8 +42,15 @@ Page({
           shopTypeText: shopTypeName(c.shopType),
           price: yuan(c.estimatedFinalPrice),
         }));
-        // 同款 cpsLink 为空 = 拼多多比价预判命中（佣金归零），引导走更优选择
         const sameItemBuyable = !!res.cpsLink;
+        const finalPrice = yuan(res.priceInfo && res.priceInfo.estimatedFinalPrice);
+        const displayPrice = yuan(res.priceInfo && res.priceInfo.displayPrice);
+        const pricePending = finalPrice === '--' || Number(finalPrice) <= 0;
+        if (res.priceInfo) {
+          res.priceInfo.finalPriceText = finalPrice;
+          res.priceInfo.displayPriceText = displayPrice;
+          res.priceInfo.pricePending = pricePending;
+        }
         this.setData({
           loading: false,
           data: res,
@@ -54,7 +63,7 @@ Page({
           platform: this.data.platform,
           is_price_compare: !sameItemBuyable,
         });
-      })
+      }))
       .catch((err) => {
         this.setData({ loading: false, error: err.message || '加载失败' });
       });
@@ -68,28 +77,43 @@ Page({
     track.event('risk_detail_view');
   },
 
-  // 盯价：需登录 + 申请订阅消息授权（PRD §5.5）
+  // 盯价：需登录 + 选择盯价范围 + 申请订阅消息授权（PRD §5.5）
   onWatch() {
     ensureLogin()
-      .then(() => this._requestSubscribe())
-      .then(() => {
+      .then(() => this._chooseWatchMode())
+      .then((watchMode) => this._requestSubscribe().then(() => watchMode))
+      .then((watchMode) => {
         const d = this.data.data;
         return api.createWatch({
           rawProductId: d.productInfo.rawProductId || d.rawProductId,
           targetPrice: null, // 由后端默认目标价规则计算
+          watchMode,
         });
       })
       .then((res) => {
         track.event('watch_create');
-        wx.showToast({ title: `已盯价，目标价 ¥${res.targetPrice}`, icon: 'none' });
+        const scope = res.watchMode === 'platform_lowest' ? '全平台同款最低价' : '当前商家';
+        wx.showToast({ title: `已盯${scope}，目标价 ¥${res.targetPrice}`, icon: 'none' });
       })
       .catch((err) => {
+        if (err && err.cancelled) return; // 用户取消选择，不提示
         if (err && err.needLogin) {
           wx.showToast({ title: '请先登录', icon: 'none' });
         } else {
           wx.showToast({ title: (err && err.message) || '盯价失败', icon: 'none' });
         }
       });
+  },
+
+  // 选择盯价范围：默认只盯当前商家这条链接
+  _chooseWatchMode() {
+    return new Promise((resolve, reject) => {
+      wx.showActionSheet({
+        itemList: ['只盯当前商家这个价', '盯全平台同款最低价'],
+        success: (res) => resolve(res.tapIndex === 1 ? 'platform_lowest' : 'merchant'),
+        fail: () => reject({ cancelled: true }),
+      });
+    });
   },
 
   _requestSubscribe() {
@@ -102,9 +126,18 @@ Page({
     });
   },
 
-  // 去购买：同款可购则走同款；比价预判命中则引导更优选择
   onBuy() {
-    const link = this.data.data.cpsLink;
+    this._executeBuy();
+  },
+
+  _executeBuy() {
+    const d = this.data.data;
+    if (!d) {
+      wx.showToast({ title: '页面加载中，请稍候', icon: 'none' });
+      return;
+    }
+    const link = d.cpsLink;
+    const linkType = (d.productInfo && d.productInfo.purchaseLinkType) || 'cps';
     if (link) {
       track.event('purchase_click', {
         platform: this.data.platform,
@@ -112,7 +145,7 @@ Page({
         is_price_compare: false,
         source: 'same_item',
       });
-      this._copyAndGuide(link);
+      this._copyAndGuide(link, linkType);
       return;
     }
     // 同款比价无返利：引导走差异化/跨平台更优选择
@@ -129,7 +162,7 @@ Page({
         content: `这款直接购买可能无返利，推荐 ${best.platformText} 同款 ¥${best.price}，是否前往？`,
         confirmText: '看看',
         success: (r) => {
-          if (r.confirm) this._copyAndGuide(best.cpsLink);
+          if (r.confirm) this._copyAndGuide(best.cpsLink, 'cps');
         },
       });
     } else {
@@ -150,18 +183,11 @@ Page({
       is_cps_matched: true,
       source: 'cross_platform',
     });
-    this._copyAndGuide(item.cpsLink);
+    this._copyAndGuide(item.cpsLink, 'cps');
   },
 
-  _copyAndGuide(link) {
-    wx.setClipboardData({
-      data: link,
-      success: () => wx.showModal({
-        title: '去购买',
-        content: '购买链接已复制，请到对应 App 打开。本产品通过官方联盟获取返佣，不影响推荐排序。',
-        showCancel: false,
-      }),
-    });
+  _copyAndGuide(link, linkType) {
+    copyPurchaseLink(link, linkType);
   },
 
   onFeedback() {

@@ -14,7 +14,8 @@
         "pages/settings/settings",
         "pages/data-notice/data-notice",
         "pages/privacy/privacy",
-        "pages/webview/webview"
+        "pages/webview/webview",
+        "pages/copy-link/copy-link"
       ]
     }
   ],
@@ -54,6 +55,9 @@
         "text": "我的"
       }
     ]
+  },
+  "usingComponents": {
+    "privacy-popup": "/components/privacy-popup/privacy-popup"
   },
   "__usePrivacyCheck__": true,
   "permission": {

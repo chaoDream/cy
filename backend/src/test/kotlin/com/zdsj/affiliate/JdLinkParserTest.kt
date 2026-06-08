@@ -31,4 +31,12 @@ class JdLinkParserTest {
     fun `returns null for non jd text`() {
         assertNull(JdLinkParser.extractItemId("https://taobao.com/item/123"))
     }
+
+    @Test
+    fun `3 cn xiaomi share uses stable short id not url search sku`() {
+        val text = "【京东】https://3.cn/2Reu-1L8 「小米17ProMAX16+512」"
+        val id = JdLinkParser.extractItemId(text)
+        assertEquals("jd_short_2Reu-1L8", id)
+        assertEquals("小米17ProMAX16+512", JdLinkParser.extractShareTitle(text))
+    }
 }

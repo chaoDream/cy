@@ -2,6 +2,7 @@ package com.zdsj.affiliate.jd
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.zdsj.affiliate.AffiliateItem
+import com.zdsj.affiliate.JdGoodsMatcher
 import com.zdsj.affiliate.JdLinkParser
 import com.zdsj.affiliate.Platform
 import com.zdsj.common.BizException
@@ -86,8 +87,8 @@ class JdUnionService(
         }
 
         JdLinkParser.extractShareTitle(linkText)?.let { title ->
-            val results = search(title, 1)
-            if (results.isNotEmpty()) return results.first().platformItemId
+            val results = search(title, 8)
+            JdGoodsMatcher.pickBest(title, results)?.platformItemId?.let { return it }
         }
         return null
     }

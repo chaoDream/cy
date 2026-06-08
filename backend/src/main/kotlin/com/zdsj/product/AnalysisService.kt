@@ -63,7 +63,8 @@ class AnalysisService(
         val (platform, _) = detected
         val item = gateway.fetchFromShareText(linkText).data
             ?: throw BizException(ErrorCode.PARSE_FAILED, "暂时没识别出来，可以换一个链接试试")
-        val itemId = item.platformItemId
+        val enriched = enrichShareMeta(item, linkText)
+        val itemId = enriched.platformItemId
 
         // 非手机品类：mock 演示数据严格拦截；真实联盟数据放行
         val parsed = skuService.parseTitle(item.title)
@@ -71,13 +72,13 @@ class AnalysisService(
             throw BizException(ErrorCode.NOT_PHONE_CATEGORY, "该商品暂不在手机品类范围内")
         }
 
-        val raw = ingestService.upsert(item)
-        skuService.resolveAndPersist(raw.id!!, item)
+        val raw = ingestService.upsert(enriched)
+        skuService.resolveAndPersist(raw.id!!, enriched)
         return ParseResult(
             platform = platform.code,
             itemId = itemId,
             rawProductId = raw.id!!,
-            productInfo = productInfoMap(item),
+            productInfo = productInfoMap(enriched),
             parseStatus = "success",
         )
     }
@@ -125,9 +126,13 @@ class AnalysisService(
 
         // 5. 跨平台同款对比
         val cross = crossPlatform(platform, sku, item, assets, userKey)
+        val purchase = resolvePurchaseLink(platform, item, userKey)
 
         return AnalysisResult(
-            productInfo = productInfoMap(item) + mapOf("rawProductId" to raw.id),
+            productInfo = productInfoMap(item) + mapOf(
+                "rawProductId" to raw.id,
+                "purchaseLinkType" to purchase.second,
+            ),
             skuInfo = mapOf(
                 "standardName" to (sku?.standardName ?: item.title),
                 "confidence" to mapping.confidence,
@@ -138,9 +143,38 @@ class AnalysisService(
             riskInfo = riskTags,
             aiRecommendation = ai,
             crossPlatform = cross,
-            cpsLink = gateway.buildCpsLink(platform, itemId, userKey).data,
+            cpsLink = purchase.first,
         )
     }
+
+    /**
+     * 购买链接：优先联盟 CPS 短链；失败或 mock 时回落商品页/分享链（须在京东 App 可打开）。
+     * @return Pair(链接, 类型 cps | product_page | share_url)
+     */
+    private fun resolvePurchaseLink(platform: Platform, item: AffiliateItem, userKey: String?): Pair<String?, String> {
+        val cps = gateway.buildCpsLink(platform, item.platformItemId, userKey).data
+        if (!cps.isNullOrBlank() && !isMockOrInvalidPurchaseUrl(cps)) {
+            return cps to "cps"
+        }
+        when (platform) {
+            Platform.JD -> {
+                if (item.platformItemId.all { it.isDigit() }) {
+                    return "https://item.jd.com/${item.platformItemId}.html" to "product_page"
+                }
+                item.sourceUrl?.takeIf { it.contains("jd.com") || it.contains("3.cn") }?.let {
+                    return it to "share_url"
+                }
+            }
+            Platform.PDD -> {
+                item.sourceUrl?.takeIf { it.isNotBlank() }?.let { return it to "share_url" }
+            }
+        }
+        return cps to if (cps.isNullOrBlank()) "none" else "cps"
+    }
+
+    private fun isMockOrInvalidPurchaseUrl(url: String): Boolean =
+        url.contains("example.com", ignoreCase = true) ||
+            url.contains("mock", ignoreCase = true)
 
     /** 简单搜索（关键词 → 候选） */
     fun search(keyword: String): List<Map<String, Any?>> {
@@ -171,9 +205,14 @@ class AnalysisService(
         val keyword = sku?.let { "${it.brand} ${it.model}" }
             ?: com.zdsj.affiliate.KeywordDegrader.degrade(selfItem.title)
             ?: selfItem.title
+        val recallTitle = (selfItem.couponInfo["_shareTitle"] as? String)?.takeIf { it.isNotBlank() }
+            ?: selfItem.title
         return Platform.entries.filter { it != self }.mapNotNull { other ->
-            val candidate = gateway.search(other, keyword).data?.firstOrNull()
+            val hits = gateway.search(other, keyword).data ?: return@mapNotNull null
+            val candidate = com.zdsj.affiliate.JdGoodsMatcher.pickBest(recallTitle, hits)
+                ?: hits.firstOrNull()
                 ?: return@mapNotNull null
+            if (!com.zdsj.affiliate.JdGoodsMatcher.matchesShareTitle(recallTitle, candidate)) return@mapNotNull null
             val price = priceEngine.compute(candidate, assets)
             mapOf(
                 "platform" to other.code,
@@ -181,7 +220,7 @@ class AnalysisService(
                 "shopName" to candidate.shopName,
                 "shopType" to candidate.shopType,
                 "estimatedFinalPrice" to price.estimatedFinalPrice,
-                "cpsLink" to gateway.buildCpsLink(other, candidate.platformItemId, userKey).data,
+                "cpsLink" to resolvePurchaseLink(other, candidate, userKey).first,
             )
         }
     }
@@ -206,27 +245,130 @@ class AnalysisService(
     }
 
     private fun fetchLiveItem(platform: Platform, itemId: String, cached: AffiliateItem?): AffiliateItem? {
-        // 短链占位 ID（jd_short_*）无法直接查 SKU，优先用库内原始分享链接/URL 重新拉取
-        if (platform == Platform.JD && itemId.startsWith("jd_short_")) {
-            val share = cached?.sourceUrl?.takeIf { it.isNotBlank() }
-            if (share != null) {
-                gateway.fetchFromShareText(share).data?.let { return it }
+        val shareTitle = resolveShareTitle(cached)
+        if (platform == Platform.JD) {
+            rebuildJdShareText(cached)?.let { shareText ->
+                gateway.fetchFromShareText(shareText).data
+                    ?.takeIf { shareTitle == null || com.zdsj.affiliate.JdGoodsMatcher.matchesShareTitle(shareTitle, it) }
+                    ?.let { resolved -> return preferPricedItem(resolved, cached, platform) }
+            }
+            if (!shareTitle.isNullOrBlank()) {
+                gateway.search(platform, shareTitle, limit = 8).data
+                    ?.let { hits -> com.zdsj.affiliate.JdGoodsMatcher.pickBest(shareTitle, hits) }
+                    ?.takeIf { com.zdsj.affiliate.JdGoodsMatcher.matchesShareTitle(shareTitle, it) }
+                    ?.let { searched -> return preferPricedItem(searched, cached, platform) }
             }
         }
-        return gateway.fetchItem(platform, itemId, bypassCache = true).data
+        val fallback = gateway.fetchItem(platform, itemId, bypassCache = true).data
+        return fallback
+            ?.takeIf { shareTitle == null || com.zdsj.affiliate.JdGoodsMatcher.matchesShareTitle(shareTitle, it) }
+            ?.let { preferPricedItem(it, cached, platform) }
     }
 
-    private fun needsAffiliateRefresh(item: AffiliateItem): Boolean =
-        item.rawPrice.compareTo(BigDecimal.ZERO) == 0 || !ProductImageUrls.isLoadable(item.imageUrl)
+    /** 短链或错误 SKU：用库内分享 URL + 标题重新解析 */
+    private fun rebuildJdShareText(cached: AffiliateItem?): String? {
+        val shareUrl = cached?.sourceUrl?.takeIf {
+            com.zdsj.affiliate.JdLinkParser.isJdShareText(it) || it.contains("3.cn") || it.contains("u.jd.com")
+        }
+        val shareTitle = resolveShareTitle(cached)
+        if (shareUrl == null && shareTitle == null) return null
+        return buildString {
+            append("【京东】")
+            shareUrl?.let { append(it).append(' ') }
+            shareTitle?.let { append('「').append(it).append('」') }
+        }.trim()
+    }
+
+    /** 分享标题：优先 _shareTitle，其次「」内文案，最后用库内 title（短链解析常只落了标题） */
+    private fun resolveShareTitle(cached: AffiliateItem?): String? {
+        if (cached == null) return null
+        (cached.couponInfo["_shareTitle"] as? String)?.takeIf { it.isNotBlank() }?.let { return it }
+        com.zdsj.affiliate.JdLinkParser.extractShareTitle(cached.title)?.let { return it }
+        return cached.title.takeIf { it.isNotBlank() && !it.startsWith("http") && it != "京东商品" }
+    }
+
+    /** 有价优先；合并分享元数据（sourceUrl / _shareTitle） */
+    private fun preferPricedItem(candidate: AffiliateItem, cached: AffiliateItem?, platform: Platform): AffiliateItem {
+        val shareTitle = resolveShareTitle(cached)
+        val merged = mergeShareMeta(candidate, cached)
+        if (shareTitle != null && !com.zdsj.affiliate.JdGoodsMatcher.matchesShareTitle(shareTitle, merged)) {
+            if (platform == Platform.JD) {
+                gateway.search(platform, shareTitle, limit = 8).data
+                    ?.let { hits -> com.zdsj.affiliate.JdGoodsMatcher.pickBest(shareTitle, hits) }
+                    ?.takeIf { com.zdsj.affiliate.JdGoodsMatcher.matchesShareTitle(shareTitle, it) }
+                    ?.let { return mergeShareMeta(it, cached) }
+            }
+            return merged.copy(rawPrice = java.math.BigDecimal.ZERO)
+        }
+        if (merged.rawPrice.compareTo(java.math.BigDecimal.ZERO) > 0) return merged
+        if (shareTitle != null && platform == Platform.JD) {
+            gateway.search(platform, shareTitle, limit = 8).data
+                ?.let { hits -> com.zdsj.affiliate.JdGoodsMatcher.pickBest(shareTitle, hits) }
+                ?.takeIf {
+                    com.zdsj.affiliate.JdGoodsMatcher.matchesShareTitle(shareTitle, it) &&
+                        it.rawPrice.compareTo(java.math.BigDecimal.ZERO) > 0
+                }
+                ?.let { return mergeShareMeta(it, cached) }
+        }
+        return merged
+    }
+
+    private fun mergeShareMeta(item: AffiliateItem, cached: AffiliateItem?): AffiliateItem {
+        if (cached == null) return item
+        val meta = item.couponInfo.toMutableMap()
+        (cached.couponInfo["_shareTitle"] as? String)?.let { meta.putIfAbsent("_shareTitle", it) }
+        resolveShareTitle(cached)?.let { meta.putIfAbsent("_shareTitle", it) }
+        return item.copy(
+            sourceUrl = cached.sourceUrl?.takeIf { it.isNotBlank() } ?: item.sourceUrl,
+            couponInfo = meta,
+        )
+    }
+
+    private fun enrichShareMeta(item: AffiliateItem, linkText: String): AffiliateItem {
+        val shareUrl = com.zdsj.affiliate.JdLinkParser.extractUrl(linkText)
+        val shareTitle = com.zdsj.affiliate.JdLinkParser.extractShareTitle(linkText)
+        val meta = item.couponInfo.toMutableMap()
+        if (!shareTitle.isNullOrBlank()) meta["_shareTitle"] = shareTitle
+        return item.copy(
+            sourceUrl = shareUrl ?: item.sourceUrl,
+            couponInfo = meta,
+        )
+    }
+
+    private fun needsAffiliateRefresh(item: AffiliateItem): Boolean {
+        val shareTitle = (item.couponInfo["_shareTitle"] as? String)?.takeIf { it.isNotBlank() }
+        if (shareTitle != null && !com.zdsj.affiliate.JdGoodsMatcher.matchesShareTitle(shareTitle, item)) {
+            return true
+        }
+        return item.rawPrice.compareTo(BigDecimal.ZERO) == 0 || !ProductImageUrls.isLoadable(item.imageUrl)
+    }
+
+    private fun hasPrice(item: AffiliateItem): Boolean =
+        item.rawPrice.compareTo(BigDecimal.ZERO) > 0
 
     private fun isRicherThanCached(fresh: AffiliateItem, cached: AffiliateItem): Boolean {
-        val freshHasPrice = fresh.rawPrice.compareTo(BigDecimal.ZERO) > 0
-        val cachedHasPrice = cached.rawPrice.compareTo(BigDecimal.ZERO) > 0
+        val freshHasPrice = hasPrice(fresh)
+        val cachedHasPrice = hasPrice(cached)
         val freshHasImage = ProductImageUrls.isLoadable(fresh.imageUrl)
         val cachedHasImage = ProductImageUrls.isLoadable(cached.imageUrl)
+        // 纠正错误 SKU：有价或标题更接近分享标题时覆盖库内残缺记录
+        val freshTitleScore = titleMatchScore(fresh.title, cached)
+        val cachedTitleScore = titleMatchScore(cached.title, cached)
+        val shareTitle = resolveShareTitle(cached)
+        val freshMatchesShare = shareTitle == null ||
+            com.zdsj.affiliate.JdGoodsMatcher.matchesShareTitle(shareTitle, fresh)
+        if (!freshMatchesShare) return false
         return (freshHasPrice && !cachedHasPrice) ||
             (freshHasImage && !cachedHasImage) ||
-            (freshHasPrice && freshHasImage)
+            (freshHasPrice && freshHasImage) ||
+            (freshHasPrice && freshTitleScore > cachedTitleScore) ||
+            (fresh.platformItemId != cached.platformItemId && freshHasPrice)
+    }
+
+    private fun titleMatchScore(title: String, cached: AffiliateItem): Int {
+        val shareTitle = resolveShareTitle(cached) ?: return 0
+        return com.zdsj.affiliate.JdGoodsMatcher.tokenize(shareTitle)
+            .count { token -> title.contains(token, ignoreCase = true) }
     }
 
     private fun looksLikePhone(title: String): Boolean {
@@ -246,6 +388,8 @@ class AnalysisService(
         "sourceUrl" to item.sourceUrl,
     )
 
-    private fun productImageProxy(platform: String, itemId: String): String =
-        "/api/product/image?platform=$platform&item_id=$itemId"
+    private fun productImageProxy(platform: String, itemId: String): String {
+        val encoded = java.net.URLEncoder.encode(itemId, Charsets.UTF_8)
+        return "/api/product/image?platform=$platform&item_id=$encoded"
+    }
 }

@@ -1,0 +1,18 @@
+<view wx:if="{{visible}}" class="pp-mask" catchtouchmove="noop">
+  <view class="pp-card">
+    <view class="pp-title">隐私授权</view>
+    <view class="pp-body">
+      <text class="pp-text">复制购买链接需使用剪贴板。请阅读并同意</text>
+      <text class="pp-link" bindtap="openContract">《{{privacyContractName}}》</text>
+      <text class="pp-text">后继续。</text>
+    </view>
+    <view class="pp-actions">
+      <button class="pp-btn pp-btn-ghost" bindtap="onDisagree">拒绝</button>
+      <button
+        class="pp-btn pp-btn-primary"
+        open-type="agreePrivacyAuthorization"
+        bindagreeprivacyauthorization="onAgree"
+      >同意并继续</button>
+    </view>
+  </view>
+</view>

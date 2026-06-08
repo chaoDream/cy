@@ -112,3 +112,27 @@ data class WatchProperties(
     val pollUserCron: String = "0 30 */4 * * ?",
     val pollNormalCron: String = "0 0 4 * * ?",
 )
+
+/** 冷启动种子采价（YAML 清单，见 zdsj.price-seed） */
+@ConfigurationProperties(prefix = "zdsj.price-seed")
+data class PriceSeedProperties(
+    val enabled: Boolean = false,
+    /** 每天定时采价（cron） */
+    val pollCron: String = "0 0 6 * * ?",
+    /** 按名称搜索时每个平台取前 N 条候选 */
+    val searchLimit: Int = 10,
+    val items: List<SeedItem> = emptyList(),
+) {
+    data class SeedItem(
+        /** 商品名称/搜索词（推荐）：自动在京东+拼多多搜索 */
+        val name: String = "",
+        /** 名称模式搜索的平台，默认京东+拼多多 */
+        val platforms: List<String> = listOf("jd", "pdd"),
+        val note: String? = null,
+        val enabled: Boolean = true,
+    ) {
+        fun isNameMode(): Boolean = name.isNotBlank()
+    }
+
+    fun enabledItems(): List<SeedItem> = items.filter { it.enabled && it.isNameMode() }
+}

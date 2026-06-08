@@ -1,0 +1,13 @@
+<view class="page">
+  <view class="card">
+    <text class="title">购买链接</text>
+    <text class="hint" wx:if="{{reason}}">{{reason}}</text>
+    <text class="hint" wx:else>点击下方按钮复制；复制成功会提示「复制成功」。</text>
+    <view class="link-box">
+      <text class="link-text" selectable>{{link}}</text>
+    </view>
+    <button class="btn-primary copy-btn" bindtap="onCopyTap">点击复制链接</button>
+    <text class="tip">复制成功后打开京东/拼多多 App，在搜索框粘贴访问。</text>
+  </view>
+</view>
+<privacy-popup></privacy-popup>

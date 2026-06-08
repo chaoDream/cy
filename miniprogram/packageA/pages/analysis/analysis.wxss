@@ -1,4 +1,12 @@
-.page {
+.page-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  box-sizing: border-box;
+}
+.page-scroll {
+  flex: 1;
+  height: 0;
   padding: 24rpx;
   box-sizing: border-box;
 }
@@ -91,19 +99,17 @@
 }
 .compliance text { color: #b0b4ba; font-size: 22rpx; line-height: 1.6; }
 .link { color: #1a73e8; font-size: 24rpx; }
-.bottom-space { height: 160rpx; }
+.bottom-space { height: 24rpx; }
 
 .action-bar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  flex-shrink: 0;
   background: #fff;
   display: flex;
   align-items: center;
   padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom));
   box-shadow: 0 -2rpx 16rpx rgba(0, 0, 0, 0.06);
   gap: 20rpx;
+  z-index: 10;
 }
 .action-sub {
   font-size: 22rpx;

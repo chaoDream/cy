@@ -1,0 +1,147 @@
+# 种子采价清单（复制为 backend/price-seeds.yml）
+# 只需写商品名称，系统会自动在京东/拼多多搜索并每天采价。
+#
+# 启用：enabled: true  或  启动时 PRICE_SEED_ENABLED=true
+# 改完后重启服务生效。
+#   - name: "iPhone 16 Pro 256GB 国行"
+#         platforms: [jd, pdd]    # 不写则默认京东+拼多多都搜
+
+#       - name: "华为 Mate 70 Pro 256GB 国行"
+#         platforms: [jd, pdd]
+
+#       - name: "小米 15 Pro 512GB 国行"
+#         platforms: [jd]
+
+#       - name: "vivo X200 Pro 512GB 国行"
+#         enabled: false            # 暂时不跟踪，不必删行
+
+zdsj:
+  price-seed:
+    enabled: true
+    poll-cron: "0 0 6 * * ?"    # 每天 06:00；测试可改成 "0 */5 * * * ?" 每 5 分钟
+    items:
+      # 苹果 (Apple) - 6款
+      - name: "iPhone 16 Pro Max 256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "iPhone 16 Pro 128GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "iPhone 16 128GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "iPhone 15 Pro Max 256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "iPhone 15 128GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "iPhone 13 128GB 国行"
+        platforms: [jd, pdd]
+
+      # 华为 (Huawei) - 7款
+      - name: "华为 Mate 70 Pro 12GB+512GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "华为 Mate 70 12GB+512GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "华为 Mate 60 Pro 512GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "华为 Pura 70 Pro 12GB+512GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "华为 Pura 70 12GB+512GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "华为 nova 12 Pro 256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "华为 Mate X5 12GB+512GB 国行"
+        platforms: [jd, pdd]
+
+      # 小米 (Xiaomi / Redmi) - 9款
+      - name: "小米 15 Pro 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "小米 15 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "小米 14 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "小米 14 Ultra 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "Redmi K70 至尊版 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "Redmi K70 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "Redmi Turbo 3 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "Redmi Note 13 Pro 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "Redmi 13C 8GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      # OPPO (含一加) - 7款
+      - name: "OPPO Find X8 Pro 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "OPPO Find X8 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "OPPO Find X7 Ultra 16GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "OPPO Reno 12 Pro 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "OPPO Reno 12 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "OPPO A2 Pro 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "一加 Ace 3 Pro 16GB+512GB 国行"
+        platforms: [jd, pdd]
+
+      # vivo (含 iQOO) - 6款
+      - name: "vivo X200 Pro 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "vivo X200 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "vivo X100 Pro 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "vivo S19 Pro 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "vivo Y200i 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "iQOO Neo 9 Pro 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      # 荣耀 (Honor) - 5款
+      - name: "荣耀 Magic 7 Pro 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "荣耀 Magic 7 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "荣耀 Magic 6 Pro 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "荣耀 200 Pro 12GB+256GB 国行"
+        platforms: [jd, pdd]
+
+      - name: "荣耀 X50 12GB+256GB 国行"
+        platforms: [jd, pdd]

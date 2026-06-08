@@ -42,6 +42,7 @@
   color: #6b7280;
 }
 .wc-status { font-size: 22rpx; margin-top: 10rpx; }
+.wc-mode { font-size: 22rpx; color: #8a9099; margin-top: 6rpx; }
 .status-watching { color: #34c759; }
 .status-hit { color: #fa3534; }
 .status-paused { color: #b0b4ba; }

@@ -5,7 +5,8 @@
   <button class="btn-ghost" bindtap="_load">重试</button>
 </view>
 
-<scroll-view wx:else scroll-y class="page" style="height: 100vh;">
+<view wx:else class="page-wrap">
+<scroll-view scroll-y class="page-scroll">
   <!-- 1. 商品基础信息 -->
   <view class="card prod">
     <image wx:if="{{data.productInfo.imageUrl}}" class="prod-img" src="{{data.productInfo.imageUrl}}" mode="aspectFill" />
@@ -34,8 +35,10 @@
   <view class="card price-card">
     <text class="card-title">当前参考到手价</text>
     <view class="price-row">
-      <text class="price-big">¥{{data.priceInfo.estimatedFinalPrice}}</text>
-      <text class="price-origin">展示价 ¥{{data.priceInfo.displayPrice}}</text>
+      <text class="price-big" wx:if="{{!data.priceInfo.pricePending}}">¥{{data.priceInfo.finalPriceText}}</text>
+      <text class="price-big muted" wx:else>待获取</text>
+      <text class="price-origin" wx:if="{{!data.priceInfo.pricePending}}">展示价 ¥{{data.priceInfo.displayPriceText}}</text>
+      <text class="price-origin muted" wx:else>联盟暂未返回价格，请重新粘贴链接或稍后重试</text>
     </view>
   </view>
 
@@ -86,9 +89,14 @@
   <view class="bottom-space"></view>
 </scroll-view>
 
-<!-- 8. 操作区 -->
-<view wx:if="{{data}}" class="action-bar">
+<!-- 8. 操作区（与 scroll-view 同级，避免 100vh 滚动层挡住按钮点击） -->
+<view class="action-bar">
   <view class="action-sub" bindtap="onFeedback">反馈错误</view>
   <button class="btn-ghost action-watch" bindtap="onWatch">盯价</button>
-  <button class="btn-primary action-buy" bindtap="onBuy">{{sameItemBuyable ? '去购买' : '看更优选择'}}</button>
+  <button
+    class="btn-primary action-buy"
+    bindtap="onBuy"
+  >{{sameItemBuyable ? '去购买' : '看更优选择'}}</button>
+</view>
+<privacy-popup></privacy-popup>
 </view>

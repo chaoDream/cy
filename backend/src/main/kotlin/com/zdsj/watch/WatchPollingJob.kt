@@ -1,18 +1,22 @@
 package com.zdsj.watch
 
+import com.zdsj.affiliate.JdGoodsMatcher
 import com.zdsj.affiliate.Platform
 import com.zdsj.affiliate.provider.AffiliateGateway
 import com.zdsj.notify.NotifyService
 import com.zdsj.price.PriceEngine
 import com.zdsj.price.PriceService
 import com.zdsj.price.UserAssets
+import com.zdsj.product.ProductRaw
 import com.zdsj.product.ProductRawRepository
+import com.zdsj.product.ProductSkuRepository
 import com.zdsj.user.AppUserRepository
 import com.zdsj.user.UserService
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 import java.time.OffsetDateTime
 
 /**
@@ -28,6 +32,7 @@ class WatchPollingJob(
     private val watchRepo: WatchItemRepository,
     private val hitRepo: AlertHitRecordRepository,
     private val rawRepo: ProductRawRepository,
+    private val skuRepo: ProductSkuRepository,
     private val userRepo: AppUserRepository,
     private val userService: UserService,
     private val gateway: AffiliateGateway,
@@ -59,15 +64,16 @@ class WatchPollingJob(
     private fun pollOne(w: WatchItem) {
         val raw = rawRepo.findById(w.rawProductId).orElse(null) ?: return
         val platform = Platform.fromCode(raw.platform) ?: return
-        val item = gateway.fetchItem(platform, raw.platformItemId, bypassCache = true).data ?: return
-
         val user = userRepo.findById(w.userId).orElse(null) ?: return
         val assets = UserAssets.from(userService.getProfile(w.userId).assetsJson)
 
-        val priceResult = priceEngine.compute(item, assets)
-        priceService.recordSnapshot(raw.id!!, w.skuId, platform.code, priceResult)
+        // platform_lowest 取该平台同款全商家最低；搜索无果时回退为只盯当前商家，避免静默失效
+        val quote = when (w.watchMode) {
+            MODE_PLATFORM_LOWEST -> lowestOnPlatform(w, raw, platform, assets) ?: fetchMerchant(w, raw, platform, assets)
+            else -> fetchMerchant(w, raw, platform, assets)
+        } ?: return
 
-        val current = priceResult.estimatedFinalPrice
+        val current = quote.price
         w.currentPrice = current
         w.updatedAt = OffsetDateTime.now()
 
@@ -77,7 +83,7 @@ class WatchPollingJob(
                 productTitle = raw.title,
                 currentPrice = current,
                 targetPrice = w.targetPrice,
-                page = "packageA/pages/analysis/analysis?platform=${raw.platform}&itemId=${raw.platformItemId}",
+                page = "packageA/pages/analysis/analysis?platform=${platform.code}&itemId=${quote.itemId}",
             )
             if (sent) {
                 hitRepo.save(AlertHitRecord(watchItemId = w.id!!, hitPrice = current))
@@ -85,5 +91,32 @@ class WatchPollingJob(
             }
         }
         watchRepo.save(w)
+    }
+
+    /** 命中价 + 命中的平台商品 ID（决定通知跳转去哪条链接） */
+    private data class Quote(val price: BigDecimal, val itemId: String)
+
+    /** 只盯当前商家这条链接 */
+    private fun fetchMerchant(w: WatchItem, raw: ProductRaw, platform: Platform, assets: UserAssets): Quote? {
+        val item = gateway.fetchItem(platform, raw.platformItemId, bypassCache = true).data ?: return null
+        val priceResult = priceEngine.compute(item, assets)
+        priceService.recordSnapshot(raw.id!!, w.skuId, platform.code, priceResult)
+        return Quote(priceResult.estimatedFinalPrice, raw.platformItemId)
+    }
+
+    /** 盯该平台同款所有商家：按 SKU 搜索，匹配过滤后取估算到手价最低的一条 */
+    private fun lowestOnPlatform(w: WatchItem, raw: ProductRaw, platform: Platform, assets: UserAssets): Quote? {
+        val sku = w.skuId?.let { skuRepo.findById(it).orElse(null) } ?: return null
+        val keyword = "${sku.brand} ${sku.model}".trim()
+        if (keyword.isBlank()) return null
+        val hits = gateway.search(platform, keyword, limit = 20).data ?: return null
+        // 用原商品标题过滤召回噪声，避免把不同型号/配件的低价误当同款最低
+        val best = hits
+            .filter { JdGoodsMatcher.matchesShareTitle(raw.title, it) }
+            .map { it to priceEngine.compute(it, assets) }
+            .minByOrNull { it.second.estimatedFinalPrice }
+            ?: return null
+        priceService.recordSnapshot(raw.id!!, w.skuId, platform.code, best.second)
+        return Quote(best.second.estimatedFinalPrice, best.first.platformItemId)
     }
 }

@@ -54,6 +54,20 @@ Page({
     api.toggleNotify(watchid, !enabled).then(() => this._load());
   },
 
+  onSwitchMode(e) {
+    const { watchid, mode } = e.currentTarget.dataset;
+    wx.showActionSheet({
+      itemList: ['只盯当前商家这个价', '盯全平台同款最低价'],
+      success: (res) => {
+        const next = res.tapIndex === 1 ? 'platform_lowest' : 'merchant';
+        if (next === mode) return;
+        api.updateWatchMode(watchid, next)
+          .then(() => this._load())
+          .catch((err) => wx.showToast({ title: (err && err.message) || '切换失败', icon: 'none' }));
+      },
+    });
+  },
+
   onRemove(e) {
     const { watchid } = e.currentTarget.dataset;
     wx.showModal({

@@ -15,10 +15,12 @@ data class WatchCreateRequest(
     val rawProductId: Long = 0,
     val skuId: Long? = null,
     val targetPrice: BigDecimal? = null,
+    val watchMode: String = MODE_MERCHANT,
 )
 
 data class TargetUpdateRequest(val watchId: Long = 0, val targetPrice: BigDecimal = BigDecimal.ZERO)
 data class NotifyToggleRequest(val watchId: Long = 0, val enabled: Boolean = true)
+data class WatchModeRequest(val watchId: Long = 0, val watchMode: String = MODE_MERCHANT)
 data class WatchRemoveRequest(val watchId: Long = 0)
 
 @RestController
@@ -30,9 +32,14 @@ class WatchController(
 
     @PostMapping("/create")
     fun create(request: HttpServletRequest, @RequestBody req: WatchCreateRequest): ApiResponse<Map<String, Any?>> {
-        val w = watchService.create(request.currentUserId(), req.rawProductId, req.skuId, req.targetPrice)
+        val w = watchService.create(request.currentUserId(), req.rawProductId, req.skuId, req.targetPrice, req.watchMode)
         return ApiResponse.ok(
-            mapOf("watchId" to w.id, "targetPrice" to w.targetPrice, "notifyStatus" to w.notifyEnabled),
+            mapOf(
+                "watchId" to w.id,
+                "targetPrice" to w.targetPrice,
+                "notifyStatus" to w.notifyEnabled,
+                "watchMode" to w.watchMode,
+            ),
         )
     }
 
@@ -54,6 +61,7 @@ class WatchController(
                 "diffToTarget" to diff,
                 "status" to it.status,
                 "notifyEnabled" to it.notifyEnabled,
+                "watchMode" to it.watchMode,
             )
         }
         return ApiResponse.ok(items)
@@ -69,6 +77,12 @@ class WatchController(
     fun toggleNotify(request: HttpServletRequest, @RequestBody req: NotifyToggleRequest): ApiResponse<Map<String, Any?>> {
         val w = watchService.toggleNotify(request.currentUserId(), req.watchId, req.enabled)
         return ApiResponse.ok(mapOf("watchId" to w.id, "notifyEnabled" to w.notifyEnabled))
+    }
+
+    @PostMapping("/mode")
+    fun updateMode(request: HttpServletRequest, @RequestBody req: WatchModeRequest): ApiResponse<Map<String, Any?>> {
+        val w = watchService.updateMode(request.currentUserId(), req.watchId, req.watchMode)
+        return ApiResponse.ok(mapOf("watchId" to w.id, "watchMode" to w.watchMode))
     }
 
     @PostMapping("/remove")

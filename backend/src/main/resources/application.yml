@@ -4,7 +4,7 @@ spring:
   profiles:
     active: dev
   config:
-    import: optional:file:./application-local.yml
+    import: optional:file:./application-local.yml,optional:file:./price-seeds.yml
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/zdsj}
     username: ${DB_USER:zdsj}
@@ -45,7 +45,7 @@ zdsj:
     subscribe-template-id: ${WX_SUB_TEMPLATE:dev_template_id}
   affiliate:
     # 联盟 API：未配置时走 mock 适配器（本地可跑通闭环）
-    mock: ${AFFILIATE_MOCK:true}
+    mock: ${AFFILIATE_MOCK:false}
     # 提供商路由：primary 主源，fallback 降级链（按序兜底），mock 永远兜底
     # 可选值：veapi | jd_official | pdd_official | mock
     provider:
@@ -103,6 +103,22 @@ zdsj:
     poll-hot-cron: "0 0 */2 * * ?"     # 热门 SKU 每 2h
     poll-user-cron: "0 30 */4 * * ?"   # 用户关注 每 4h
     poll-normal-cron: "0 0 4 * * ?"    # 普通 每天 04:00
+  price-seed:
+    # 冷启动历史价：配商品名称 → 自动在京东/拼多多搜索 → 每天采价攒曲线
+    # 长清单可放到 backend/price-seeds.yml（spring.config.import 自动加载）
+    enabled: ${PRICE_SEED_ENABLED:false}
+    poll-cron: "0 0 6 * * ?"           # 名称模式：每天 06:00 采价
+    search-limit: 10
+    items:
+      - name: "iPhone 16 Pro 256GB 国行"
+        platforms: [jd, pdd]
+      - name: "华为 Mate 70 Pro 256GB 国行"
+        platforms: [jd, pdd]
+      - name: "小米 15 Pro 512GB 国行"
+        platforms: [jd]
+      - name: "vivo X200 Pro 512GB 国行"
+        platforms: [jd, pdd]
+        enabled: false                   # 示例：单条停用
   avatar:
     storage-dir: ${AVATAR_STORAGE_DIR:./data/avatars}
     public-path-prefix: /static/avatars
