@@ -105,14 +105,17 @@ Page({
   },
 
   onSwitchMode(e) {
-    const { watchid, mode } = e.currentTarget.dataset;
+    const { watchid, mode, index } = e.currentTarget.dataset;
     wx.showActionSheet({
       itemList: ['只盯当前商家这个价', '盯全平台同款最低价'],
       success: (res) => {
         const next = res.tapIndex === 1 ? 'platform_lowest' : 'merchant';
         if (next === mode) return;
         api.updateWatchMode(watchid, next)
-          .then(() => this._load())
+          .then(() => {
+            // 只就地更新这一项，不重载整列表（避免闪动）
+            this.setData({ [`list[${index}].watchMode`]: next });
+          })
           .catch((err) => wx.showToast({ title: (err && err.message) || '切换失败', icon: 'none' }));
       },
     });
@@ -121,8 +124,8 @@ Page({
   onRemove(e) {
     const { watchid } = e.currentTarget.dataset;
     wx.showModal({
-      title: '取消盯价',
-      content: '确定不再盯这个商品了吗？',
+      title: '删除盯价',
+      content: '确定删除这个盯价吗？',
       success: (res) => {
         if (res.confirm) api.removeWatch(watchid).then(() => this._load());
       },

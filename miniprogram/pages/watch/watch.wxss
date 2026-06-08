@@ -55,13 +55,16 @@
   margin-top: auto;
   padding-top: 12rpx;
 }
-.wc-status { font-size: 22rpx; }
+.wc-status { font-size: 22rpx; line-height: 1; display: inline-flex; align-items: center; }
 .wc-mode {
   font-size: 20rpx;
+  line-height: 1;
   color: #8a9099;
   background: #f2f3f5;
   border-radius: 6rpx;
-  padding: 2rpx 12rpx;
+  padding: 6rpx 12rpx;
+  display: inline-flex;
+  align-items: center;
 }
 .status-watching { color: #34c759; }
 .status-hit { color: #fa3534; }

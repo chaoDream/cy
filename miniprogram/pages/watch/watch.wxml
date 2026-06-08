@@ -25,9 +25,7 @@
         <view class="wc-info">
           <text class="wc-title">{{item.title}}</text>
           <view class="wc-meta">
-            <text class="wc-status status-{{item.status}}">
-              {{item.status === 'hit' ? '已达目标价' : (item.status === 'paused' ? '已暂停' : '盯价中')}}
-            </text>
+            <text class="wc-status status-{{item.status}}">{{item.status === 'hit' ? '已达目标价' : (item.status === 'paused' ? '已暂停' : '盯价中')}}</text>
             <text class="wc-mode">{{item.watchMode === 'platform_lowest' ? '全平台同款最低价' : '当前商家'}}</text>
           </view>
         </view>
@@ -51,8 +49,8 @@
       <text wx:if="{{item.status === 'hit'}}" class="wc-hit-tip">已达目标价，请重新订阅以继续提醒</text>
       <view class="wc-actions">
         <text class="wc-act" data-watchid="{{item.watchId}}" data-current="{{item.targetPrice}}" bindtap="onEditTarget">改目标价</text>
-        <text class="wc-act" data-watchid="{{item.watchId}}" data-mode="{{item.watchMode}}" bindtap="onSwitchMode">切换范围</text>
-        <text class="wc-act danger" data-watchid="{{item.watchId}}" bindtap="onRemove">取消</text>
+        <text class="wc-act" data-index="{{index}}" data-watchid="{{item.watchId}}" data-mode="{{item.watchMode}}" bindtap="onSwitchMode">切换范围</text>
+        <text class="wc-act danger" data-watchid="{{item.watchId}}" bindtap="onRemove">删除盯价</text>
       </view>
     </view>
   </block>
