@@ -1,14 +1,13 @@
 /**
- * 复制购买链接 + 隐私授权编排。
+ * 复制购买链接 + 隐私授权。
  *
- * 流程：
- * 1. 已授权（本地标记或 getPrivacySetting=已同意）→ 直接写剪贴板。
- * 2. 未授权 → 主动弹出自定义隐私弹窗（privacy-popup 组件）：
- *    - 同意 → agreePrivacyAuthorization 授权后写剪贴板。
- *    - 不同意 → 跳转复制购买链接页面。
+ * 流程（微信官方推荐）：
+ * 1. 用户点击购买 → wx.requirePrivacyAuthorize
+ * 2. 未授权 → onNeedPrivacyAuthorization → privacy-popup → resolve
+ * 3. requirePrivacyAuthorize success → wx.setClipboardData
  */
 
-const PRIVACY_OK_KEY = '__clipboard_privacy_ok__';
+const dbg = require('./privacy-debug');
 
 const GUIDE = {
   cps: '联盟推广链接已复制。请打开京东/拼多多 App，在顶部搜索框粘贴并访问。',
@@ -18,11 +17,6 @@ const GUIDE = {
 };
 
 function markPrivacyAgreed() {
-  try {
-    wx.setStorageSync(PRIVACY_OK_KEY, '1');
-  } catch (e) {
-    // ignore
-  }
   const app = getApp();
   if (app && app.globalData) {
     app.globalData.clipboardPrivacyOk = true;
@@ -51,55 +45,103 @@ function openCopyLinkPage(link, reason, linkType) {
 }
 
 function parseCopyError(err) {
-  const msg = ((err && err.errMsg) || '').toLowerCase();
+  const raw = dbg.formatErr(err);
+  const msg = raw.toLowerCase();
+  // 小程序后台「用户隐私保护指引」未声明剪贴板 API——代码无法绕过，只能后台补配置
+  if (/not declared|api scope|未在隐私协议中声明|未声明/.test(msg)) {
+    return {
+      type: 'not_declared',
+      text: '小程序后台未声明剪贴板权限，暂无法自动复制',
+      raw,
+    };
+  }
   if (/privacy|authorize|authorization/.test(msg)) {
-    return { type: 'privacy', text: '需先同意隐私协议' };
+    return { type: 'privacy', text: '需先同意隐私协议', raw };
   }
   if (/permission|denied/.test(msg)) {
-    return { type: 'permission', text: '剪贴板写入被拒绝' };
+    return { type: 'permission', text: '剪贴板写入被拒绝', raw };
   }
-  return { type: 'other', text: (err && err.errMsg) || '复制失败' };
+  return { type: 'other', text: raw || '复制失败', raw };
 }
 
-/** 真正写剪贴板（调用方需已确保隐私已授权） */
-function writeClipboard(link, linkType) {
+function handleCopyFail(link, linkType, parsed, context) {
+  dbg.push('copyFail', { context, type: parsed.type, raw: parsed.raw });
+  // 后台未声明剪贴板：弹窗无意义，直接进手动复制页
+  if (parsed.type === 'not_declared') {
+    wx.showToast({ title: '请手动复制链接', icon: 'none', duration: 2000 });
+    setTimeout(() => openCopyLinkPage(link, parsed.text, linkType || 'default'), 300);
+    return;
+  }
+  showCopyFailModal(link, linkType, parsed, context);
+}
+
+function showCopyFailModal(link, linkType, parsed, context) {
   const type = linkType || 'default';
+  const recent = dbg.getRecentLogText();
+  const detail = [
+    parsed.text,
+    context ? `阶段: ${context}` : '',
+    parsed.raw ? `微信: ${parsed.raw}` : '',
+    recent ? `\n--- 日志 ---\n${recent}` : '',
+  ].filter(Boolean).join('\n');
+  dbg.push('showCopyFailModal', { context, raw: parsed.raw });
+  wx.showModal({
+    title: '未能复制',
+    content: detail.slice(0, 500),
+    confirmText: '查看链接',
+    cancelText: '取消',
+    success: (res) => {
+      if (res.confirm) openCopyLinkPage(link, parsed.text, type);
+    },
+  });
+}
+
+/** 授权通过后写剪贴板 */
+function writeClipboardDirect(link, linkType) {
+  const type = linkType || 'default';
+  dbg.push('setClipboardData.start', { len: (link || '').length, type });
   wx.setClipboardData({
     data: link,
     success: () => {
+      dbg.push('setClipboardData.success');
       markPrivacyAgreed();
       showCopySuccessGuide(type);
     },
     fail: (err) => {
       const parsed = parseCopyError(err);
-      wx.showModal({
-        title: '未能复制',
-        content: parsed.type === 'privacy' ? '需同意隐私协议后才能复制购买链接。' : parsed.text,
-        confirmText: '查看链接',
-        cancelText: '取消',
-        success: (res) => {
-          if (res.confirm) openCopyLinkPage(link, parsed.text, type);
-        },
-      });
+      dbg.push('setClipboardData.fail', parsed.raw);
+      handleCopyFail(link, type, parsed, 'setClipboardData');
     },
   });
 }
 
-function showPrivacyPopup(link, linkType) {
-  const app = getApp();
-  const popup = app && app.globalData && app.globalData.privacyPopup;
-  if (popup && typeof popup.show === 'function') {
-    popup.show(link, linkType);
-  } else {
-    // 兜底：没有挂载弹窗组件时直接进复制链接页
-    openCopyLinkPage(link, '', linkType);
+/** 先走隐私授权，再复制 */
+function requestClipboardCopy(link, linkType) {
+  const type = linkType || 'default';
+  const runCopy = () => writeClipboardDirect(link, type);
+
+  if (typeof wx.requirePrivacyAuthorize !== 'function') {
+    dbg.push('requirePrivacyAuthorize.unsupported');
+    runCopy();
+    return;
   }
+
+  dbg.push('requirePrivacyAuthorize.start');
+  wx.requirePrivacyAuthorize({
+    success: () => {
+      dbg.push('requirePrivacyAuthorize.success');
+      runCopy();
+    },
+    fail: (err) => {
+      const parsed = parseCopyError(err);
+      dbg.push('requirePrivacyAuthorize.fail', parsed.raw);
+      openCopyLinkPage(link, parsed.text || '用户拒绝隐私授权', type);
+    },
+  });
 }
 
 /**
- * 复制购买链接，自动处理隐私授权。
- * @param {string} link
- * @param {string} [linkType]
+ * 复制购买链接（商品分析页「去购买」入口）。
  */
 function copyPurchaseLink(link, linkType) {
   if (!link) {
@@ -110,24 +152,16 @@ function copyPurchaseLink(link, linkType) {
   const app = getApp();
   if (app && app.globalData) {
     app.globalData.pendingPurchase = { link, linkType: type };
+    app.globalData.clipboardDebugLog = [];
   }
-  // 权威判断只信 getPrivacySetting，不信本地标记（本地标记可能与微信端实际授权状态不一致）
+  dbg.push('copyPurchaseLink.start', { type, linkPreview: link.slice(0, 60) });
   if (typeof wx.getPrivacySetting === 'function') {
     wx.getPrivacySetting({
-      success: (res) => {
-        if (res.needAuthorization) {
-          showPrivacyPopup(link, type);
-        } else {
-          markPrivacyAgreed();
-          writeClipboard(link, type);
-        }
-      },
-      // 取不到隐私状态：保守起见也弹授权弹窗，避免直接失败
-      fail: () => showPrivacyPopup(link, type),
+      success: (res) => dbg.push('getPrivacySetting', res),
+      fail: (err) => dbg.push('getPrivacySetting.fail', dbg.formatErr(err)),
     });
-  } else {
-    writeClipboard(link, type);
   }
+  requestClipboardCopy(link, type);
 }
 
 function copyLinkDirect(link) {
@@ -151,8 +185,9 @@ function copyLinkDirect(link) {
 module.exports = {
   copyPurchaseLink,
   copyLinkDirect,
-  writeClipboard,
+  writeClipboard: writeClipboardDirect,
   markPrivacyAgreed,
   openCopyLinkPage,
   parseCopyError,
+  requestClipboardCopy,
 };

@@ -12,7 +12,7 @@
     </view>
     <view class="pc-price">
       <text class="muted">参考到手价</text>
-      <text class="price-big">¥{{item.bestFinalPrice || item.estimatedFinalPrice || item.rawPrice}}</text>
+      <text class="price-big">{{priceText === '--' ? '--' : '¥' + priceText}}</text>
     </view>
   </view>
 </view>

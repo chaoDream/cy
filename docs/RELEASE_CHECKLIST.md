@@ -5,6 +5,7 @@
 - [ ] 企业主体小程序账号（个人号无法用比价/导购类目）。
 - [ ] 服务类目：选择「电商平台 / 导购」相关类目并提交资质（比价类需额外说明）。
 - [ ] 隐私协议：小程序后台「用户隐私保护指引」配置完成，`app.json` 已开启 `__usePrivacyCheck__: true`。
+- [ ] **剪贴板声明（必做）**：后台「用户隐私保护指引」→ 增加「写入剪贴板 / wx.setClipboardData」，用途填「复制商品购买链接以便跳转电商平台」。未声明会导致 `api scope is not declared in the privacy agreement`，自动复制永久失败。
 - [ ] 用户协议、隐私政策、数据来源说明、CPS 披露、价格免责声明在小程序内可访问（已内置「我的 → 数据说明 / 隐私政策」）。
 - [ ] request 合法域名：后台「开发设置」配置后端 https 域名；`utils/config.js` 切到 `prod`。
 - [ ] 订阅消息模板：申请「降价提醒」一次性订阅模板，模板 id 同步到后端 `WX_SUB_TEMPLATE` 与小程序 `config.subscribeTemplateId`。

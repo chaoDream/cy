@@ -19,7 +19,7 @@ const DEFAULT_API_TARGET = 'local';
 const REMOTE_BASE_URL = 'http://62.234.81.122';
 
 // 真机联调本地后端：填开发机局域网 IP（换 Wi-Fi 后若连不上先更新此项）
-const DEV_LAN_IP = '192.168.0.104';
+const DEV_LAN_IP = '192.168.0.107';
 
 function getApiTarget() {
   const stored = safeGetStorageSync(API_TARGET_STORAGE_KEY);

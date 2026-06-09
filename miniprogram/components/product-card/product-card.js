@@ -1,13 +1,18 @@
-const { platformName } = require('../../utils/format');
+const { platformName, yuanTrim } = require('../../utils/format');
 
 Component({
   properties: {
     item: { type: Object, value: null },
   },
-  data: { platformText: '' },
+  data: { platformText: '', priceText: '--' },
   observers: {
     item(v) {
-      if (v) this.setData({ platformText: platformName(v.platform) });
+      if (!v) return;
+      const price = v.bestFinalPrice || v.estimatedFinalPrice || v.rawPrice;
+      this.setData({
+        platformText: platformName(v.platform),
+        priceText: price > 0 ? yuanTrim(price) : '--',
+      });
     },
   },
   methods: {

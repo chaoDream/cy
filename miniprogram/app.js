@@ -1,5 +1,6 @@
 const { restoreLogin } = require('./utils/auth');
 const track = require('./utils/track');
+const dbg = require('./utils/privacy-debug');
 
 App({
   globalData: {
@@ -12,6 +13,11 @@ App({
     },
     clipboardPrivacyOk: false,
     pendingPurchase: null,
+    pendingPrivacyResolve: null,
+    pendingPrivacyEventInfo: null,
+    privacyResolve: null,
+    clipboardDebugLog: [],
+    lastClipboardError: null,
   },
 
   onLaunch() {
@@ -26,6 +32,23 @@ App({
       // ignore
     }
     this.globalData.clipboardPrivacyOk = false;
+    if (typeof wx.onNeedPrivacyAuthorization === 'function') {
+      wx.onNeedPrivacyAuthorization((resolve, eventInfo) => {
+        dbg.push('onNeedPrivacyAuthorization', {
+          referrer: eventInfo && eventInfo.referrer,
+          hasPopup: !!(this.globalData.privacyPopup),
+        });
+        this.globalData.privacyResolve = resolve;
+        const popup = this.globalData.privacyPopup;
+        if (popup && typeof popup.handlePrivacyAuth === 'function') {
+          popup.handlePrivacyAuth(resolve, eventInfo);
+        } else {
+          this.globalData.pendingPrivacyResolve = resolve;
+          this.globalData.pendingPrivacyEventInfo = eventInfo;
+          dbg.push('onNeedPrivacyAuthorization.pendingPopup');
+        }
+      });
+    }
     restoreLogin().catch(() => {});
     track.event('app_open');
   },

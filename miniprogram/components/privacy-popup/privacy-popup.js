@@ -1,4 +1,7 @@
-const { writeClipboard, markPrivacyAgreed, openCopyLinkPage } = require('../../utils/purchase');
+const { requestClipboardCopy, markPrivacyAgreed, openCopyLinkPage } = require('../../utils/purchase');
+const dbg = require('../../utils/privacy-debug');
+
+const AGREE_BUTTON_ID = 'pp-agree';
 
 Component({
   data: {
@@ -13,13 +16,12 @@ Component({
       const app = getApp();
       if (app && app.globalData) {
         app.globalData.privacyPopup = this;
-      }
-      // 兜底：若某处直接调用了隐私 API 触发原生授权请求，也用本弹窗承接
-      if (typeof wx.onNeedPrivacyAuthorization === 'function') {
-        wx.onNeedPrivacyAuthorization((resolve) => {
-          this._resolve = resolve;
-          this.setData({ visible: true });
-        });
+        dbg.push('privacyPopup.attached');
+        if (typeof app.globalData.pendingPrivacyResolve === 'function') {
+          this.handlePrivacyAuth(app.globalData.pendingPrivacyResolve, app.globalData.pendingPrivacyEventInfo);
+          app.globalData.pendingPrivacyResolve = null;
+          app.globalData.pendingPrivacyEventInfo = null;
+        }
       }
     },
     detached() {
@@ -33,33 +35,68 @@ Component({
   methods: {
     noop() {},
 
-    /** 由 purchase.js 主动调用：携带待复制链接弹出 */
-    show(link, linkType) {
-      this._link = link || '';
-      this._type = linkType || 'default';
+    handlePrivacyAuth(resolve, eventInfo) {
+      this._resolve = resolve;
+      const app = getApp();
+      if (app && app.globalData) {
+        app.globalData.privacyResolve = resolve;
+      }
+      const pending = app && app.globalData && app.globalData.pendingPurchase;
+      if (pending && pending.link) {
+        this._link = pending.link;
+        this._type = pending.linkType || 'default';
+      }
+      dbg.push('privacyPopup.show', {
+        hasResolve: true,
+        referrer: eventInfo && eventInfo.referrer,
+        hasLink: !!this._link,
+      });
       this.setData({ visible: true });
     },
 
     onAgree() {
-      markPrivacyAgreed();
+      const app = getApp();
+      const resolveFn = this._resolve
+        || (app && app.globalData && app.globalData.privacyResolve);
+      dbg.push('privacyPopup.onAgree', { hasResolve: typeof resolveFn === 'function' });
+
       this.setData({ visible: false });
-      // 原生挂起的请求（兜底分支）：放行后由原调用自动继续
-      if (typeof this._resolve === 'function') {
-        this._resolve({ event: 'agree', buttonId: 'pp-agree' });
+
+      if (typeof resolveFn === 'function') {
+        try {
+          resolveFn({ event: 'agree', buttonId: AGREE_BUTTON_ID });
+          dbg.push('privacyPopup.resolve.called', AGREE_BUTTON_ID);
+        } catch (e) {
+          dbg.push('privacyPopup.resolve.error', dbg.formatErr(e));
+        }
         this._resolve = null;
+        if (app && app.globalData) {
+          app.globalData.privacyResolve = null;
+        }
+        markPrivacyAgreed();
         return;
       }
-      // 主动弹窗分支：直接复制
+
+      // 无挂起 resolve：requirePrivacyAuthorize 未触发，授权后再试
+      dbg.push('privacyPopup.onAgree.noResolve');
+      markPrivacyAgreed();
       if (this._link) {
-        writeClipboard(this._link, this._type);
+        requestClipboardCopy(this._link, this._type);
       }
     },
 
     onDisagree() {
+      const app = getApp();
+      const resolveFn = this._resolve
+        || (app && app.globalData && app.globalData.privacyResolve);
+      dbg.push('privacyPopup.onDisagree', { hasResolve: typeof resolveFn === 'function' });
       this.setData({ visible: false });
-      if (typeof this._resolve === 'function') {
-        this._resolve({ event: 'disagree' });
+      if (typeof resolveFn === 'function') {
+        resolveFn({ event: 'disagree' });
         this._resolve = null;
+        if (app && app.globalData) {
+          app.globalData.privacyResolve = null;
+        }
       }
       const link = this._link;
       const type = this._type;

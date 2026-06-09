@@ -29,13 +29,22 @@ class RankService(
             .filter { it.skuId != null }
             .groupBy { it.skuId!! }
             .mapNotNull { (skuId, snaps) ->
-                val best = snaps.minByOrNull { it.estimatedFinalPrice } ?: return@mapNotNull null
+                // 排除降级/空价写入的 0 价快照，否则 0 会被当成最低价
+                val best = snaps
+                    .filter { it.estimatedFinalPrice > BigDecimal.ZERO }
+                    .minByOrNull { it.estimatedFinalPrice } ?: return@mapNotNull null
                 val sku = skuRepo.findById(skuId).orElse(null) ?: return@mapNotNull null
                 if (brand != null && !sku.brand.equals(brand, ignoreCase = true)) return@mapNotNull null
                 if (priceMin != null && best.estimatedFinalPrice < priceMin) return@mapNotNull null
                 if (priceMax != null && best.estimatedFinalPrice > priceMax) return@mapNotNull null
-                val riskTags = mappingRepo.findBySkuId(skuId).flatMap { it.riskTags }.distinct()
+                val mappings = mappingRepo.findBySkuId(skuId)
+                val riskTags = mappings.flatMap { it.riskTags }.distinct()
                 val raw = rawRepo.findById(best.rawProductId).orElse(null)
+                // 最低价那条可能没图，从同款其它链接兜底取一张有图的
+                val imageUrl = raw?.imageUrl?.takeIf { it.isNotBlank() }
+                    ?: mappings.asSequence()
+                        .mapNotNull { rawRepo.findById(it.rawProductId).orElse(null)?.imageUrl }
+                        .firstOrNull { it.isNotBlank() }
                 mapOf(
                     "skuId" to skuId,
                     "standardName" to sku.standardName,
@@ -44,7 +53,7 @@ class RankService(
                     "platform" to best.platform,
                     "rawProductId" to best.rawProductId,
                     "platformItemId" to raw?.platformItemId,
-                    "imageUrl" to raw?.imageUrl,
+                    "imageUrl" to imageUrl,
                     "title" to raw?.title,
                     "riskTags" to riskTags,
                     "capturedAt" to best.capturedAt.toString(),

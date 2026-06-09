@@ -4,6 +4,7 @@
     "ai-conclusion": "/components/ai-conclusion/ai-conclusion",
     "price-waterfall": "/components/price-waterfall/price-waterfall",
     "price-trend": "/components/price-trend/price-trend",
-    "risk-tag": "/components/risk-tag/risk-tag"
+    "risk-tag": "/components/risk-tag/risk-tag",
+    "privacy-popup": "/components/privacy-popup/privacy-popup"
   }
 }
