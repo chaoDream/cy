@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>历史价格 - 折线图方案</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #eef0f3;
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+    padding: 24px;
+    display: flex;
+    gap: 28px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .phone {
+    width: 375px;
+    background: #f5f6f8;
+    border-radius: 28px;
+    padding: 14px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.12);
+  }
+  .label { text-align:center; font-size:13px; color:#8a9099; margin-bottom:10px; }
+
+  /* ---- 历史价格卡片 ---- */
+  .pt {
+    background: #fff;
+    border-radius: 16px;
+    padding: 18px 16px 14px;
+  }
+  .pt-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .card-title { font-size: 16px; font-weight: 600; color: #1d2129; }
+  .pt-range-tabs { display: flex; gap: 6px; }
+  .pt-tab {
+    font-size: 12px; color: #86909c;
+    padding: 3px 10px; border-radius: 20px; background: #f2f3f5;
+  }
+  .pt-tab.on { color: #fff; background: #ff5000; }
+
+  .pt-summary {
+    display: flex; align-items: baseline; gap: 8px;
+    margin: 10px 0 2px;
+  }
+  .pt-cur-label { font-size: 12px; color: #86909c; }
+  .pt-cur-price { font-size: 26px; font-weight: 700; color: #ff5000; }
+  .pt-cur-price small { font-size: 14px; }
+  .pt-badge {
+    font-size: 11px; color: #00a86b; background: #e8f8f1;
+    padding: 2px 8px; border-radius: 6px; font-weight: 500;
+  }
+
+  .pt-lows {
+    display: flex; gap: 20px; margin: 6px 0 12px;
+  }
+  .pt-low-item { font-size: 12px; color: #86909c; display:flex; align-items:center; gap:5px; }
+  .pt-low-item .dot { width: 14px; height: 0; border-top: 2px dashed #c9cdd4; }
+  .pt-low-item.l30 .dot { border-color: #4e93ff; }
+  .pt-low-item.l90 .dot { border-color: #b37feb; }
+  .pt-low-item .price { color: #1d2129; font-weight: 600; }
+
+  svg { display: block; width: 100%; }
+
+  .pt-note {
+    margin-top: 10px; font-size: 12px;
+    color: #ff7d00; background: #fff7e8;
+    padding: 8px 10px; border-radius: 8px;
+  }
+  .pt-good {
+    margin-top: 10px; font-size: 12px;
+    color: #00a86b; background: #e8f8f1;
+    padding: 8px 10px; border-radius: 8px;
+  }
+</style>
+</head>
+<body>
+
+<!-- 方案A：接近低价（正向） -->
+<div class="phone">
+  <div class="label">方案 · 历史价格（折线 + 参考线）</div>
+  <div class="pt">
+    <div class="pt-head">
+      <span class="card-title">历史价格</span>
+      <div class="pt-range-tabs">
+        <span class="pt-tab">30天</span>
+        <span class="pt-tab on">90天</span>
+      </div>
+    </div>
+
+    <div class="pt-summary">
+      <span class="pt-cur-label">当前到手价</span>
+      <span class="pt-cur-price"><small>¥</small>5099</span>
+      <span class="pt-badge">接近近30天低价</span>
+    </div>
+
+    <div class="pt-lows">
+      <span class="pt-low-item l30"><span class="dot"></span>30天低 <span class="price">¥5049</span></span>
+      <span class="pt-low-item l90"><span class="dot"></span>90天低 <span class="price">¥4999</span></span>
+    </div>
+
+    <!-- 图表 -->
+    <svg id="chart" viewBox="0 0 343 180" preserveAspectRatio="none"></svg>
+
+    <div class="pt-good">✓ 当前已接近近 30 天低价，可考虑入手</div>
+  </div>
+</div>
+
+<!-- 方案B：先涨后降（预警） -->
+<div class="phone">
+  <div class="label">同款 · 命中「先涨后降」预警态</div>
+  <div class="pt">
+    <div class="pt-head">
+      <span class="card-title">历史价格</span>
+      <div class="pt-range-tabs">
+        <span class="pt-tab">30天</span>
+        <span class="pt-tab on">90天</span>
+      </div>
+    </div>
+
+    <div class="pt-summary">
+      <span class="pt-cur-label">当前到手价</span>
+      <span class="pt-cur-price"><small>¥</small>5399</span>
+    </div>
+
+    <div class="pt-lows">
+      <span class="pt-low-item l30"><span class="dot"></span>30天低 <span class="price">¥5099</span></span>
+      <span class="pt-low-item l90"><span class="dot"></span>90天低 <span class="price">¥4999</span></span>
+    </div>
+
+    <svg id="chart2" viewBox="0 0 343 180" preserveAspectRatio="none"></svg>
+
+    <div class="pt-note">⚠️ 折扣可能不实（先涨后降）：近期标价被抬高</div>
+  </div>
+</div>
+
+<script>
+// 通用折线图绘制
+function drawChart(svgId, opts) {
+  const svg = document.getElementById(svgId);
+  const W = 343, H = 180;
+  const padL = 8, padR = 8, padT = 18, padB = 22;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  const data = opts.points;          // [{d:'04-01', p:5200}, ...]
+  const low30 = opts.low30, low90 = opts.low90;
+
+  const prices = data.map(p => p.p);
+  let min = Math.min(...prices, low90);
+  let max = Math.max(...prices);
+  const span = (max - min) || 1;
+  min = min - span * 0.12;           // 动态留白，Y 轴不从 0 开始
+  max = max + span * 0.12;
+
+  const x = i => padL + (plotW * i) / (data.length - 1);
+  const y = v => padT + plotH * (1 - (v - min) / (max - min));
+
+  let out = '';
+
+  // 参考线：90天低、30天低
+  const refs = [
+    { v: low90, color: '#b37feb', label: '90天低' },
+    { v: low30, color: '#4e93ff', label: '30天低' },
+  ];
+  refs.forEach(r => {
+    const yy = y(r.v);
+    out += `<line x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}" stroke="${r.color}" stroke-width="1" stroke-dasharray="4 4" opacity="0.7"/>`;
+  });
+
+  // 面积填充
+  const linePts = data.map((p,i) => `${x(i)},${y(p.p)}`).join(' ');
+  const areaPts = `${padL},${padT+plotH} ` + linePts + ` ${W-padR},${padT+plotH}`;
+  out += `<defs><linearGradient id="g_${svgId}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ff5000" stop-opacity="0.18"/>
+            <stop offset="100%" stop-color="#ff5000" stop-opacity="0"/>
+          </linearGradient></defs>`;
+  out += `<polygon points="${areaPts}" fill="url(#g_${svgId})"/>`;
+
+  // 折线
+  out += `<polyline points="${linePts}" fill="none" stroke="#ff5000" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+
+  // 历史最低点标记
+  const minIdx = prices.indexOf(Math.min(...prices));
+  out += `<circle cx="${x(minIdx)}" cy="${y(prices[minIdx])}" r="3.5" fill="#fff" stroke="#00a86b" stroke-width="2"/>`;
+  out += `<text x="${x(minIdx)}" y="${y(prices[minIdx])+14}" font-size="10" fill="#00a86b" text-anchor="middle">最低 ¥${prices[minIdx]}</text>`;
+
+  // 当前价（末点）标记
+  const li = data.length - 1;
+  out += `<circle cx="${x(li)}" cy="${y(prices[li])}" r="4" fill="#ff5000" stroke="#fff" stroke-width="2"/>`;
+
+  // X 轴稀疏日期标签（首、中、尾）
+  [0, Math.floor(li/2), li].forEach(i => {
+    out += `<text x="${x(i)}" y="${H-6}" font-size="10" fill="#c0c4cc" text-anchor="${i===0?'start':i===li?'end':'middle'}">${data[i].d}</text>`;
+  });
+
+  svg.innerHTML = out;
+}
+
+// 样例数据：90天，整体下行到接近低点
+function gen(seed, base, drift, noise, endBias) {
+  const pts = [];
+  let v = base;
+  for (let i = 0; i < 14; i++) {
+    seed = (seed * 9301 + 49297) % 233280;
+    const rnd = seed / 233280;
+    v += drift + (rnd - 0.5) * noise;
+    const day = new Date(2026, 2, 1 + i*7);
+    const d = `${String(day.getMonth()+1).padStart(2,'0')}-${String(day.getDate()).padStart(2,'0')}`;
+    pts.push({ d, p: Math.round(v) });
+  }
+  pts[pts.length-1].p += endBias;
+  return pts;
+}
+
+const a = gen(7, 5350, -25, 90, 0);
+a[a.length-1].p = 5099;            // 当前接近低价
+drawChart('chart', { points: a, low30: 5049, low90: 4999 });
+
+// 方案B：先涨后降——前期低，近期被抬高
+const b = gen(3, 5050, 0, 60, 0);
+b[b.length-3].p = 5060;
+b[b.length-2].p = 5260;
+b[b.length-1].p = 5399;            // 当前被抬高
+drawChart('chart2', { points: b, low30: 5099, low90: 4999 });
+</script>
+</body>
+</html>

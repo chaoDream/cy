@@ -104,10 +104,10 @@ data class AffiliateProperties(
 @ConfigurationProperties(prefix = "zdsj.ai")
 data class AiProperties(
     val mock: Boolean = true,
-    val baseUrl: String = "",
+    val baseUrl: String = "https://api.deepseek.com/v1",
     val apiKey: String = "",
-    val modelHigh: String = "gpt-4o",
-    val modelFast: String = "gpt-4o-mini",
+    val modelHigh: String = "deepseek-v4-pro",
+    val modelFast: String = "deepseek-v4-flash",
 )
 
 @ConfigurationProperties(prefix = "zdsj.watch")

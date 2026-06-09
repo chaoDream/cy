@@ -8,44 +8,75 @@
   align-items: center;
   justify-content: space-between;
 }
-.card-title { font-size: 30rpx; font-weight: 600; }
-.pt-lows {
-  display: flex;
-  gap: 20rpx;
+.card-title { font-size: 30rpx; font-weight: 600; color: #1d2129; }
+
+.pt-tabs { display: flex; gap: 12rpx; }
+.pt-tab {
   font-size: 24rpx;
-  color: #6b7280;
+  color: #86909c;
+  padding: 6rpx 20rpx;
+  border-radius: 40rpx;
+  background: #f2f3f5;
 }
+.pt-tab.on { color: #fff; background: #ff5000; }
+
+.pt-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 14rpx;
+  margin-top: 20rpx;
+}
+.pt-cur-label { font-size: 24rpx; color: #86909c; }
+.pt-cur-price { font-size: 44rpx; font-weight: 700; color: #ff5000; }
+.pt-badge {
+  font-size: 22rpx;
+  color: #00a86b;
+  background: #e8f8f1;
+  padding: 4rpx 14rpx;
+  border-radius: 10rpx;
+}
+
+.pt-low-line {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  color: #86909c;
+}
+.pt-low-dot {
+  width: 28rpx;
+  height: 0;
+  border-top: 3rpx dashed #c9cdd4;
+}
+.pt-low-dot.d30 { border-color: #4e93ff; }
+.pt-low-dot.d90 { border-color: #b37feb; }
+.pt-low-text .price { color: #1d2129; font-weight: 600; }
+
+.pt-canvas-wrap {
+  position: relative;
+  margin-top: 16rpx;
+}
+.pt-canvas {
+  width: 100%;
+  height: 360rpx;
+  display: block;
+}
+.pt-range-empty {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #b0b4ba;
+  font-size: 26rpx;
+}
+
 .pt-empty {
   color: #b0b4ba;
   font-size: 26rpx;
   padding: 40rpx 0;
   text-align: center;
-}
-.pt-chart {
-  display: flex;
-  align-items: flex-end;
-  height: 240rpx;
-  margin-top: 24rpx;
-  gap: 8rpx;
-}
-.pt-bar-wrap {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  height: 100%;
-}
-.pt-bar {
-  width: 60%;
-  background: linear-gradient(180deg, #4d8df6, #1a73e8);
-  border-radius: 8rpx 8rpx 0 0;
-  min-height: 8rpx;
-}
-.pt-date {
-  font-size: 18rpx;
-  color: #b0b4ba;
-  margin-top: 8rpx;
 }
 .pt-warn {
   margin-top: 16rpx;

@@ -1,6 +1,7 @@
 package com.zdsj.ai
 
 import com.zdsj.config.AiProperties
+import org.slf4j.LoggerFactory
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
@@ -45,16 +46,13 @@ class AiAnalysisService(
     private val redis: RedisTemplate<String, Any>,
     private val llmClient: LlmClient,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
 
     fun analyze(skuId: Long?, input: AiInput): AiResult {
         val cacheKey = "ai:analysis:${input.platform}:${skuId ?: input.title.hashCode()}:${input.currentFinalPrice}"
         readCache(cacheKey)?.let { return it }
 
-        val result = if (props.mock || props.apiKey.isBlank()) {
-            ruleBased(input)
-        } else {
-            llmClient.analyze(input) ?: ruleBased(input)
-        }
+        val result = resolveRecommendation(input)
 
         recordRepo.save(
             AiAnalysisRecord(
@@ -84,8 +82,19 @@ class AiAnalysisService(
         runCatching { redis.opsForValue().set(key, result, Duration.ofHours(6)) }
     }
 
+    /** mock / 无 key 直接走规则；否则调大模型，无有效返回时自动降级 ruleBased。 */
+    private fun resolveRecommendation(input: AiInput): AiResult {
+        if (props.mock || props.apiKey.isBlank()) {
+            return ruleBased(input)
+        }
+        val llm = llmClient.analyze(input)
+        if (llm != null) return llm
+        log.info("大模型无有效返回，降级到规则推理")
+        return ruleBased(input)
+    }
+
     /** 确定性规则推理（mock / 降级）。结论可追溯到价格事实。 */
-    private fun ruleBased(input: AiInput): AiResult {
+    internal fun ruleBased(input: AiInput): AiResult {
         val reasons = mutableListOf<String>()
         var conclusion = Conclusion.CAUTION
 

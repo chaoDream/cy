@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>历史价格 - 折线图（区间切换）</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #eef0f3;
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    padding: 24px; display: flex; gap: 28px; flex-wrap: wrap; justify-content: center;
+  }
+  .phone { width: 360px; background: #f5f6f8; border-radius: 28px; padding: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.12); }
+  .label { text-align:center; font-size:13px; color:#8a9099; margin-bottom:10px; }
+  .pt { background:#fff; border-radius:16px; padding:18px 16px 14px; }
+  .pt-head { display:flex; align-items:center; justify-content:space-between; }
+  .card-title { font-size:16px; font-weight:600; color:#1d2129; }
+  .pt-tabs { display:flex; gap:6px; }
+  .pt-tab { font-size:12px; color:#86909c; padding:4px 12px; border-radius:20px; background:#f2f3f5; }
+  .pt-tab.on { color:#fff; background:#ff5000; }
+  .pt-summary { display:flex; align-items:baseline; gap:8px; margin:12px 0 2px; }
+  .pt-cur-label { font-size:12px; color:#86909c; }
+  .pt-cur-price { font-size:24px; font-weight:700; color:#ff5000; }
+  .pt-badge { font-size:11px; color:#00a86b; background:#e8f8f1; padding:2px 8px; border-radius:6px; }
+  .pt-low { display:flex; align-items:center; gap:6px; margin:4px 0 6px; font-size:12px; color:#86909c; }
+  .pt-low .dot { width:16px; height:0; border-top:2px dashed #4e93ff; }
+  .pt-low.l90 .dot { border-color:#b37feb; }
+  .pt-low .price { color:#1d2129; font-weight:600; }
+  svg { display:block; width:100%; }
+  .pt-good { margin-top:10px; font-size:12px; color:#00a86b; background:#e8f8f1; padding:8px 10px; border-radius:8px; }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="label">区间：30天（参考线=30天最低）</div>
+  <div class="pt">
+    <div class="pt-head">
+      <span class="card-title">历史价格</span>
+      <div class="pt-tabs"><span class="pt-tab on">30天</span><span class="pt-tab">90天</span></div>
+    </div>
+    <div class="pt-summary">
+      <span class="pt-cur-label">当前到手价</span>
+      <span class="pt-cur-price">¥5099</span>
+      <span class="pt-badge">接近30天低价</span>
+    </div>
+    <div class="pt-low"><span class="dot"></span><span>30天最低 <span class="price">¥5049</span></span></div>
+    <svg id="c30" viewBox="0 0 328 170" preserveAspectRatio="none"></svg>
+    <div class="pt-good">✓ 当前已接近近 30 天低价</div>
+  </div>
+</div>
+
+<div class="phone">
+  <div class="label">区间：90天（参考线=90天最低）</div>
+  <div class="pt">
+    <div class="pt-head">
+      <span class="card-title">历史价格</span>
+      <div class="pt-tabs"><span class="pt-tab">30天</span><span class="pt-tab on">90天</span></div>
+    </div>
+    <div class="pt-summary">
+      <span class="pt-cur-label">当前到手价</span>
+      <span class="pt-cur-price">¥5099</span>
+    </div>
+    <div class="pt-low l90"><span class="dot"></span><span>90天最低 <span class="price">¥4999</span></span></div>
+    <svg id="c90" viewBox="0 0 328 170" preserveAspectRatio="none"></svg>
+  </div>
+</div>
+
+<script>
+function draw(svgId, data, low, refColor) {
+  const W=328,H=170,padL=12,padR=14,padT=18,padB=22;
+  const plotW=W-padL-padR, plotH=H-padT-padB;
+  const prices=data.map(p=>p.p);
+  let min=Math.min(...prices,low), max=Math.max(...prices);
+  const span=(max-min)||1; min-=span*0.12; max+=span*0.12;
+  const n=data.length;
+  const X=i=> n===1?padL+plotW/2 : padL+plotW*i/(n-1);
+  const Y=v=> padT+plotH*(1-(v-min)/(max-min));
+  let s='';
+  s+=`<line x1="${padL}" y1="${Y(low)}" x2="${W-padR}" y2="${Y(low)}" stroke="${refColor}" stroke-width="1" stroke-dasharray="4 4" opacity="0.75"/>`;
+  const line=data.map((p,i)=>`${X(i)},${Y(p.p)}`).join(' ');
+  s+=`<defs><linearGradient id="g${svgId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ff5000" stop-opacity="0.18"/><stop offset="100%" stop-color="#ff5000" stop-opacity="0"/></linearGradient></defs>`;
+  s+=`<polygon points="${padL},${padT+plotH} ${line} ${W-padR},${padT+plotH}" fill="url(#g${svgId})"/>`;
+  s+=`<polyline points="${line}" fill="none" stroke="#ff5000" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  const mv=Math.min(...prices), mi=prices.indexOf(mv);
+  s+=`<circle cx="${X(mi)}" cy="${Y(mv)}" r="3.5" fill="#fff" stroke="#00a86b" stroke-width="2"/>`;
+  s+=`<text x="${X(mi)}" y="${Y(mv)+15}" font-size="10" fill="#00a86b" text-anchor="${mi===0?'start':mi===n-1?'end':'middle'}">最低 ¥${mv}</text>`;
+  const li=n-1;
+  s+=`<circle cx="${X(li)}" cy="${Y(prices[li])}" r="4" fill="#ff5000" stroke="#fff" stroke-width="2"/>`;
+  s+=`<text x="${X(li)}" y="${Y(prices[li])-9}" font-size="10" fill="#ff5000" text-anchor="end">当前 ¥${prices[li]}</text>`;
+  [0,Math.floor(li/2),li].forEach(i=>{
+    s+=`<text x="${X(i)}" y="${H-6}" font-size="10" fill="#c0c4cc" text-anchor="${i===0?'start':i===li?'end':'middle'}">${data[i].d}</text>`;
+  });
+  document.getElementById(svgId).innerHTML=s;
+}
+
+const d90=[
+  {d:'03-01',p:5380},{d:'03-08',p:5320},{d:'03-15',p:5299},{d:'03-22',p:5260},
+  {d:'03-29',p:5180},{d:'04-05',p:5150},{d:'04-12',p:5099},{d:'04-19',p:5120},
+  {d:'04-26',p:5080},{d:'05-03',p:4999},{d:'05-10',p:5049},{d:'05-17',p:5060},
+  {d:'05-24',p:5079},{d:'05-31',p:5099}
+];
+const d30=d90.slice(-5);
+
+draw('c90', d90, 4999, '#b37feb');
+draw('c30', d30, 5049, '#4e93ff');
+</script>
+</body>
+</html>

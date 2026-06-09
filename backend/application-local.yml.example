@@ -37,3 +37,9 @@ zdsj:
       client-id: YOUR_PDD_CLIENT_ID
       client-secret: YOUR_PDD_CLIENT_SECRET
       pid: YOUR_PDD_PID               # 推广位，格式如 123456_789012345
+  ai:
+    mock: false
+    base-url: https://api.deepseek.com/v1
+    api-key: YOUR_DEEPSEEK_API_KEY
+    model-high: deepseek-v4-pro
+    model-fast: deepseek-v4-flash

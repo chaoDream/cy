@@ -1,21 +1,32 @@
 <view class="pt">
   <view class="pt-head">
     <text class="card-title">历史价格</text>
-    <view class="pt-lows">
-      <text>30天低 <text class="price">¥{{low30}}</text></text>
-      <text>90天低 <text class="price">¥{{low90}}</text></text>
+    <view class="pt-tabs">
+      <text class="pt-tab {{range === '30' ? 'on' : ''}}" data-r="30" bindtap="onSwitchRange">30天</text>
+      <text class="pt-tab {{range === '90' ? 'on' : ''}}" data-r="90" bindtap="onSwitchRange">90天</text>
     </view>
   </view>
 
   <view wx:if="{{trend.historyInsufficient}}" class="pt-empty">历史价格积累中，已为你从今天开始记录</view>
 
-  <view wx:else class="pt-chart">
-    <view class="pt-bar-wrap" wx:for="{{bars}}" wx:key="index">
-      <view class="pt-bar" style="height: {{item.height}}%"></view>
-      <text class="pt-date">{{item.date}}</text>
+  <block wx:else>
+    <view class="pt-summary">
+      <text class="pt-cur-label">当前到手价</text>
+      <text class="pt-cur-price">¥{{curText}}</text>
+      <text wx:if="{{trend.nearLow}}" class="pt-badge">接近30天低价</text>
     </view>
-  </view>
 
-  <view wx:if="{{trend.fakeDiscount}}" class="pt-warn">{{trend.note}}</view>
-  <view wx:elif="{{trend.nearLow}}" class="pt-good">当前已接近近 30 天低价</view>
+    <view class="pt-low-line">
+      <text class="pt-low-dot {{range === '30' ? 'd30' : 'd90'}}"></text>
+      <text class="pt-low-text">{{range}}天最低 <text class="price">¥{{lowText}}</text></text>
+    </view>
+
+    <view class="pt-canvas-wrap">
+      <canvas type="2d" id="ptCanvas" class="pt-canvas"></canvas>
+      <view wx:if="{{rangeEmpty}}" class="pt-range-empty">近 {{range}} 天数据积累中</view>
+    </view>
+
+    <view wx:if="{{trend.fakeDiscount}}" class="pt-warn">{{trend.note}}</view>
+    <view wx:elif="{{trend.nearLow}}" class="pt-good">当前已接近近 30 天低价</view>
+  </block>
 </view>
