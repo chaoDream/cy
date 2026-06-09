@@ -64,11 +64,53 @@ class JdUnionService(
         return extractGoodsList(data).mapNotNull { mapGoodsNode(it, keyword) }
     }
 
-    fun buildCpsLink(material: String): String? {
-        val data = client.convertLink(material) ?: return null
-        return data.path("shortURL").asText(null)
-            ?: data.path("clickURL").asText(null)
+    /**
+     * 单品推广转链。京东规则：sceneId=1 仅支持 jingfen 联盟链；item.jd.com 须 sceneId=2（需联盟权限）。
+     * sceneId=1 + item.jd.com 会落到活动推广页（如「又好又便宜」），非商品详情。
+     */
+    fun buildCpsLink(skuId: String): String? {
+        if (!skuId.all { it.isDigit() }) {
+            return convertLinkToPromoUrl(skuId, sceneId = null)
+        }
+        val attempts = listOf(
+            "https://item.jd.com/$skuId.html" to 2,
+            "https://jingfen.jd.com/detail/$skuId.html" to 1,
+            skuId to 2,
+        )
+        for ((material, sceneId) in attempts) {
+            convertLinkToPromoUrl(material, sceneId)?.let { return it }
+        }
+        return null
     }
+
+    private fun convertLinkToPromoUrl(material: String, sceneId: Int?): String? {
+        val data = client.convertLink(material, sceneId) ?: return null
+        return pickPromoUrl(data, material)
+    }
+
+    private fun pickPromoUrl(data: JsonNode, material: String): String? {
+        val skuFromApi = data.path("skuId").asText(null)?.takeIf { it.all(Char::isDigit) }
+        val expectedSku = JdLinkParser.extractItemIdFromUrl(material)
+            ?: material.takeIf { it.all(Char::isDigit) }
+        if (skuFromApi != null && expectedSku != null && skuFromApi != expectedSku) return null
+
+        val click = data.path("clickURL").asText(null)
+        val short = data.path("shortURL").asText(null)
+        if (click != null) {
+            if (expectedSku == null || clickContainsSku(click, expectedSku) || skuFromApi == expectedSku) {
+                return click
+            }
+        }
+        if (skuFromApi != null && expectedSku != null && skuFromApi == expectedSku) {
+            return short ?: click
+        }
+        return null
+    }
+
+    private fun clickContainsSku(clickUrl: String, skuId: String): Boolean =
+        clickUrl.contains(skuId) ||
+            clickUrl.contains("item.jd.com/$skuId") ||
+            clickUrl.contains("item.m.jd.com/product/$skuId")
 
     private fun resolveSkuId(linkText: String): String? {
         val direct = JdLinkParser.extractItemId(linkText)

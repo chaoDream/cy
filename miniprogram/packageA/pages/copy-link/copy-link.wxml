@@ -7,7 +7,7 @@
       <text class="link-text" selectable>{{link}}</text>
     </view>
     <button class="btn-primary copy-btn" bindtap="onCopyTap">点击复制链接</button>
-    <text class="tip">复制成功后打开京东/拼多多 App，在搜索框粘贴访问。</text>
+    <text class="tip">{{tip}}</text>
   </view>
 </view>
 <privacy-popup></privacy-popup>

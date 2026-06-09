@@ -33,6 +33,7 @@ Page({
 
   onCardTap(e) {
     const item = e.detail;
+    if (!item || !item.platform || !item.platformItemId) return;
     wx.navigateTo({
       url: `/packageA/pages/analysis/analysis?platform=${item.platform}&itemId=${item.platformItemId}`,
     });

@@ -40,10 +40,11 @@ class JdUnionClient(
         jd.appKey.isNotBlank() && jd.appSecret.isNotBlank() && jd.unionId.isNotBlank()
 
     /** 转链：短链/长链/口令分享 URL → 推广链接（含落地页信息） */
-    fun convertLink(materialUrl: String): JsonNode? {
+    fun convertLink(materialUrl: String, sceneId: Int? = null): JsonNode? {
         val req = mutableMapOf<String, Any>(
             "materialId" to materialUrl,
         )
+        sceneId?.let { req["sceneId"] = it }
         when {
             jd.siteId.isNotBlank() -> req["siteId"] = jd.siteId
             else -> req["unionId"] = jd.unionId.toLong()

@@ -229,7 +229,7 @@ Page({
         is_price_compare: false,
         source: 'same_item',
       });
-      this._copyAndGuide(link, linkType);
+      this._copyAndGuide(link, linkType, this.data.platform);
       return;
     }
     // 同款比价无返利：引导走差异化/跨平台更优选择
@@ -246,7 +246,7 @@ Page({
         content: `这款直接购买可能无返利，推荐 ${best.platformText} 同款 ¥${best.price}，是否前往？`,
         confirmText: '看看',
         success: (r) => {
-          if (r.confirm) this._copyAndGuide(best.cpsLink, 'cps');
+          if (r.confirm) this._copyAndGuide(best.cpsLink, 'cps', best.platform);
         },
       });
     } else {
@@ -267,11 +267,11 @@ Page({
       is_cps_matched: true,
       source: 'cross_platform',
     });
-    this._copyAndGuide(item.cpsLink, 'cps');
+    this._copyAndGuide(item.cpsLink, 'cps', item.platform);
   },
 
-  _copyAndGuide(link, linkType) {
-    copyPurchaseLink(link, linkType);
+  _copyAndGuide(link, linkType, platform) {
+    copyPurchaseLink(link, linkType, platform);
   },
 
   onFeedback() {

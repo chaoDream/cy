@@ -17,12 +17,20 @@ Page({
   onLoad() {
     const recent = (wx.getStorageSync('recentQueries') || []).map((r) => ({
       ...r,
-      imageUrl: resolveImageUrl(r.imageUrl),
+      imageUrl: resolveImageUrl(this._toRelativeImage(r.imageUrl)),
     }));
     this.setData({
       assets: app.getAssets(),
       recent,
     });
+  },
+
+  // 历史记录里可能存了带旧 host 的绝对代理地址（如 127.0.0.1），
+  // 切环境后会失效；把它还原成相对路径，再按当前环境 resolve
+  _toRelativeImage(url) {
+    if (!url) return '';
+    const idx = url.indexOf('/api/product/image');
+    return idx >= 0 ? url.slice(idx) : url;
   },
 
   onShow() {
@@ -100,6 +108,7 @@ Page({
 
   onCardTap(e) {
     const item = e.detail;
+    if (!item || !item.platform || !item.itemId) return;
     this._gotoAnalysis(item.platform, item.itemId);
   },
 
@@ -115,17 +124,21 @@ Page({
   },
 
   _saveRecent(res) {
-    const recent = this.data.recent.filter(
+    // 存相对路径，渲染时再按当前环境 resolveImageUrl；
+    // 不能把绝对地址写进 storage——切换 devtools/真机/远程后旧 host 不可达，图就裂了
+    const stored = (wx.getStorageSync('recentQueries') || []).filter(
       (r) => !(r.platform === res.platform && r.itemId === res.itemId),
     );
-    recent.unshift({
+    stored.unshift({
       platform: res.platform,
       itemId: res.itemId,
       title: res.productInfo.title,
-      imageUrl: resolveImageUrl(res.productInfo.imageUrl),
+      imageUrl: res.productInfo.imageUrl,
     });
-    const next = recent.slice(0, 10);
-    this.setData({ recent: next });
+    const next = stored.slice(0, 10);
     wx.setStorageSync('recentQueries', next);
+    this.setData({
+      recent: next.map((r) => ({ ...r, imageUrl: resolveImageUrl(r.imageUrl) })),
+    });
   },
 });

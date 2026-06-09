@@ -41,6 +41,15 @@ class PriceService(private val snapshotRepo: PriceSnapshotRepository) {
         ),
     )
 
+    /** 按自然日聚合：每天取最低到手价作为该日的趋势点，日期升序 */
+    private fun dailyPoints(snapshots: List<PriceSnapshot>): List<TrendPoint> =
+        snapshots
+            .groupBy { it.capturedAt.toLocalDate() }
+            .toSortedMap()
+            .map { (date, daySnaps) ->
+                TrendPoint(date.toString(), daySnaps.minOf { it.estimatedFinalPrice })
+            }
+
     fun low30(skuId: Long): BigDecimal? =
         snapshotRepo.findMinFinalPriceBySkuSince(skuId, OffsetDateTime.now().minusDays(30))
 
@@ -54,15 +63,17 @@ class PriceService(private val snapshotRepo: PriceSnapshotRepository) {
         }
         val since = OffsetDateTime.now().minusDays(90)
         val snapshots = snapshotRepo.findBySkuSince(skuId, since)
-        if (snapshots.size < 3) {
+        // 同一天可能因多次查询/轮询写入多条快照，按自然日聚合为一个点（取当日最低到手价），
+        // 否则趋势图会把同一天画成多根柱子。以「天数」而非「快照条数」判断历史是否充足。
+        val points = dailyPoints(snapshots)
+        if (points.size < 3) {
             return PriceTrend(
-                points = snapshots.map { TrendPoint(it.capturedAt.toLocalDate().toString(), it.estimatedFinalPrice) },
+                points = points,
                 low30 = low30(skuId), low90 = low90(skuId),
                 nearLow = false, fakeDiscount = false,
                 historyInsufficient = true, note = "历史价格积累中",
             )
         }
-        val points = snapshots.map { TrendPoint(it.capturedAt.toLocalDate().toString(), it.estimatedFinalPrice) }
         val l30 = low30(skuId)
         val l90 = low90(skuId)
         val nearLow = l30 != null && currentPrice <= l30 * BigDecimal("1.03")

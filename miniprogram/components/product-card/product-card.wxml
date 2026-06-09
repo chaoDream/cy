@@ -1,4 +1,4 @@
-<view class="pc" bindtap="onTap">
+<view class="pc" catchtap="onTap">
   <image wx:if="{{item.imageUrl}}" class="pc-img" src="{{item.imageUrl}}" mode="aspectFill" lazy-load />
   <view wx:else class="pc-img pc-img-empty">无图</view>
   <view class="pc-body">
@@ -8,7 +8,7 @@
       <text class="pc-shop" wx:if="{{item.shopName}}">{{item.shopName}}</text>
     </view>
     <view class="pc-tags" wx:if="{{item.riskTags.length}}">
-      <text class="pc-risk" wx:for="{{item.riskTags}}" wx:key="*this">{{item}}</text>
+      <text class="pc-risk" wx:for="{{item.riskTags}}" wx:for-item="tag" wx:key="*this">{{tag}}</text>
     </view>
     <view class="pc-price">
       <text class="muted">参考到手价</text>

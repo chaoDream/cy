@@ -355,7 +355,7 @@ zdsj:
 |------|------|----------|
 | 京东·按 SKU 取价/图/标题 | `/jd/promotiongoodsinfo` | `skuIds` |
 | 京东·关键词搜索 | `/jd/jd_search` | `keyword` / `pageSize` |
-| 京东·转链 | `/jd/prombysubuid` | `materialId`、`sceneId=1`（public 追加 `pid`/`positionId`/`sessionkey`） |
+| 京东·单品转链 | `/jd/jd_prombyuid` | `materialId`、`unionId`（必填）、`sceneId=2`、`chainType=1`（长链 clickURL） |
 | 拼多多·详情/搜索 | `/pdd/pdd_goodssearch` | `goods_sign_list` / `keyword`（数字 ID 加 `usenumid=1`） |
 | 拼多多·转链 | `/pdd/pdd_promlink` | `goods_sign_list`、`p_id` |
 

@@ -1,6 +1,8 @@
 package com.zdsj.product
 
 import com.zdsj.affiliate.AffiliateItem
+import com.zdsj.affiliate.JdLinkParser
+import com.zdsj.affiliate.JdSearchRemedy
 import com.zdsj.affiliate.Platform
 import com.zdsj.affiliate.ProductImageUrls
 import com.zdsj.affiliate.provider.AffiliateGateway
@@ -64,21 +66,21 @@ class AnalysisService(
         val item = gateway.fetchFromShareText(linkText).data
             ?: throw BizException(ErrorCode.PARSE_FAILED, "暂时没识别出来，可以换一个链接试试")
         val enriched = enrichShareMeta(item, linkText)
-        val itemId = enriched.platformItemId
+        val priced = ensureJdPricedItem(enriched, linkText)
 
         // 非手机品类：mock 演示数据严格拦截；真实联盟数据放行
-        val parsed = skuService.parseTitle(item.title)
-        if (affiliateProps.mock && parsed.brand == null && !looksLikePhone(item.title)) {
+        val parsed = skuService.parseTitle(priced.title)
+        if (affiliateProps.mock && parsed.brand == null && !looksLikePhone(priced.title)) {
             throw BizException(ErrorCode.NOT_PHONE_CATEGORY, "该商品暂不在手机品类范围内")
         }
 
-        val raw = ingestService.upsert(enriched)
-        skuService.resolveAndPersist(raw.id!!, enriched)
+        val raw = ingestService.upsert(priced)
+        skuService.resolveAndPersist(raw.id!!, priced)
         return ParseResult(
             platform = platform.code,
-            itemId = itemId,
+            itemId = priced.platformItemId,
             rawProductId = raw.id!!,
-            productInfo = productInfoMap(enriched),
+            productInfo = productInfoMap(priced),
             parseStatus = "success",
         )
     }
@@ -153,7 +155,7 @@ class AnalysisService(
      */
     private fun resolvePurchaseLink(platform: Platform, item: AffiliateItem, userKey: String?): Pair<String?, String> {
         val cps = gateway.buildCpsLink(platform, item.platformItemId, userKey).data
-        if (!cps.isNullOrBlank() && !isMockOrInvalidPurchaseUrl(cps)) {
+        if (!cps.isNullOrBlank() && !isMockOrInvalidPurchaseUrl(cps) && jdPurchaseLinkTrusted(platform, cps, item.platformItemId)) {
             return cps to "cps"
         }
         when (platform) {
@@ -175,6 +177,18 @@ class AnalysisService(
     private fun isMockOrInvalidPurchaseUrl(url: String): Boolean =
         url.contains("example.com", ignoreCase = true) ||
             url.contains("mock", ignoreCase = true)
+
+    /**
+     * 京东 u.jd.com 短链在 sceneId 错配时可能落到活动页；无法确认指向当前 SKU 时改用 item.jd.com 商品页。
+     */
+    private fun jdPurchaseLinkTrusted(platform: Platform, link: String, skuId: String): Boolean {
+        if (platform != Platform.JD || !skuId.all { it.isDigit() }) return true
+        if (link.contains(skuId)) return true
+        if (link.contains("item.jd.com/$skuId") || link.contains("item.m.jd.com")) return true
+        if (link.contains("union-click.jd.com") && link.contains("e=")) return true
+        if (link.contains("u.jd.com") || link.contains("3.cn/")) return false
+        return true
+    }
 
     /** 简单搜索（关键词 → 候选） */
     fun search(keyword: String): List<Map<String, Any?>> {
@@ -252,12 +266,8 @@ class AnalysisService(
                     ?.takeIf { shareTitle == null || com.zdsj.affiliate.JdGoodsMatcher.matchesShareTitle(shareTitle, it) }
                     ?.let { resolved -> return preferPricedItem(resolved, cached, platform) }
             }
-            if (!shareTitle.isNullOrBlank()) {
-                gateway.search(platform, shareTitle, limit = 8).data
-                    ?.let { hits -> com.zdsj.affiliate.JdGoodsMatcher.pickBest(shareTitle, hits) }
-                    ?.takeIf { com.zdsj.affiliate.JdGoodsMatcher.matchesShareTitle(shareTitle, it) }
-                    ?.let { searched -> return preferPricedItem(searched, cached, platform) }
-            }
+            jdSearchRemedy(shareTitle, itemId.takeIf { it.all(Char::isDigit) })
+                ?.let { searched -> return preferPricedItem(searched, cached, platform) }
         }
         val fallback = gateway.fetchItem(platform, itemId, bypassCache = true).data
         return fallback
@@ -287,30 +297,52 @@ class AnalysisService(
         return cached.title.takeIf { it.isNotBlank() && !it.startsWith("http") && it != "京东商品" }
     }
 
-    /** 有价优先；合并分享元数据（sourceUrl / _shareTitle） */
+    /** 有价优先；合并分享元数据（sourceUrl / _shareTitle / _jdSkuId） */
     private fun preferPricedItem(candidate: AffiliateItem, cached: AffiliateItem?, platform: Platform): AffiliateItem {
         val shareTitle = resolveShareTitle(cached)
         val merged = mergeShareMeta(candidate, cached)
+        val numericSku = cached?.platformItemId?.takeIf { it.all(Char::isDigit) }
+            ?: merged.couponInfo["_jdSkuId"] as? String
         if (shareTitle != null && !com.zdsj.affiliate.JdGoodsMatcher.matchesShareTitle(shareTitle, merged)) {
             if (platform == Platform.JD) {
-                gateway.search(platform, shareTitle, limit = 8).data
-                    ?.let { hits -> com.zdsj.affiliate.JdGoodsMatcher.pickBest(shareTitle, hits) }
-                    ?.takeIf { com.zdsj.affiliate.JdGoodsMatcher.matchesShareTitle(shareTitle, it) }
+                jdSearchRemedy(shareTitle, numericSku)
                     ?.let { return mergeShareMeta(it, cached) }
             }
-            return merged.copy(rawPrice = java.math.BigDecimal.ZERO)
+            return merged.copy(rawPrice = BigDecimal.ZERO)
         }
-        if (merged.rawPrice.compareTo(java.math.BigDecimal.ZERO) > 0) return merged
-        if (shareTitle != null && platform == Platform.JD) {
-            gateway.search(platform, shareTitle, limit = 8).data
-                ?.let { hits -> com.zdsj.affiliate.JdGoodsMatcher.pickBest(shareTitle, hits) }
-                ?.takeIf {
-                    com.zdsj.affiliate.JdGoodsMatcher.matchesShareTitle(shareTitle, it) &&
-                        it.rawPrice.compareTo(java.math.BigDecimal.ZERO) > 0
-                }
+        if (JdSearchRemedy.hasPrice(merged)) return merged
+        if (platform == Platform.JD) {
+            jdSearchRemedy(shareTitle, numericSku)
                 ?.let { return mergeShareMeta(it, cached) }
         }
         return merged
+    }
+
+    /**
+     * 链接解析：数字 SKU 直查无价时，搜索落库带价的 materialId，避免分析页长期 rawPrice=0。
+     */
+    private fun ensureJdPricedItem(item: AffiliateItem, linkText: String): AffiliateItem {
+        if (item.platform != Platform.JD.code || JdSearchRemedy.hasPrice(item)) return item
+        val shareTitle = (item.couponInfo["_shareTitle"] as? String)
+            ?: JdLinkParser.extractShareTitle(linkText)
+            ?: item.title.takeIf { it.isNotBlank() && !it.startsWith("http") && it != "京东商品" }
+        val numericSku = item.platformItemId.takeIf { it.all(Char::isDigit) }
+        val found = jdSearchRemedy(shareTitle, numericSku) ?: return item
+        return mergeShareMeta(found, item)
+    }
+
+    /** 京东搜索补救：完整标题 → KeywordDegrader → 品牌+型号 → 数字 SKU */
+    private fun jdSearchRemedy(shareTitle: String?, numericSku: String? = null): AffiliateItem? {
+        if (shareTitle.isNullOrBlank() && numericSku.isNullOrBlank()) return null
+        for (keyword in JdSearchRemedy.recallKeywords(shareTitle, numericSku)) {
+            val hits = gateway.search(Platform.JD, keyword, 8).data ?: continue
+            val picked = when {
+                !shareTitle.isNullOrBlank() -> JdSearchRemedy.pickPricedMatch(shareTitle, hits)
+                else -> JdSearchRemedy.pickPricedBySku(hits, numericSku!!)
+            } ?: continue
+            return picked
+        }
+        return null
     }
 
     private fun mergeShareMeta(item: AffiliateItem, cached: AffiliateItem?): AffiliateItem {
@@ -318,6 +350,8 @@ class AnalysisService(
         val meta = item.couponInfo.toMutableMap()
         (cached.couponInfo["_shareTitle"] as? String)?.let { meta.putIfAbsent("_shareTitle", it) }
         resolveShareTitle(cached)?.let { meta.putIfAbsent("_shareTitle", it) }
+        cached.platformItemId.takeIf { it.all(Char::isDigit) }?.let { meta.putIfAbsent("_jdSkuId", it) }
+        (cached.couponInfo["_jdSkuId"] as? String)?.let { meta.putIfAbsent("_jdSkuId", it) }
         return item.copy(
             sourceUrl = cached.sourceUrl?.takeIf { it.isNotBlank() } ?: item.sourceUrl,
             couponInfo = meta,

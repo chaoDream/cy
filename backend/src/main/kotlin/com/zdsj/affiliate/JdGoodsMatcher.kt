@@ -45,6 +45,10 @@ object JdGoodsMatcher {
         }?.key
     }
 
+    /** 标题中出现的品牌原文（用于构造「vivo S60」类召回词） */
+    fun brandWordInTitle(text: String, brandKey: String): String? =
+        brandAliases[brandKey]?.firstOrNull { text.contains(it, ignoreCase = true) }
+
     internal fun tokenize(query: String): List<String> {
         val normalized = query.lowercase()
             .replace(Regex("""[+／/|]"""), " ")

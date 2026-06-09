@@ -67,6 +67,8 @@ zdsj:
         sessionkey: ${VEAPI_JD_SESSIONKEY:}
         union-id: ${VEAPI_JD_UNION_ID:}
         position-id: ${VEAPI_JD_POSITION_ID:}
+        scene-id: ${VEAPI_JD_SCENE_ID:2}        # 维易+京东单品转链：2=item.jd.com/数字SKU
+        chain-type: ${VEAPI_JD_CHAIN_TYPE:1}    # 1=长链 clickURL（直达商品页更稳）
       pdd:
         auth-mode: ${VEAPI_PDD_AUTH_MODE:self}
         sessionkey: ${VEAPI_PDD_SESSIONKEY:}

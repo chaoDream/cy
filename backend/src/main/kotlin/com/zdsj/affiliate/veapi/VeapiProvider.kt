@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.zdsj.affiliate.AffiliateItem
 import com.zdsj.affiliate.JdGoodsMatcher
 import com.zdsj.affiliate.JdLinkParser
-import com.zdsj.affiliate.KeywordDegrader
+import com.zdsj.affiliate.JdSearchRemedy
 import com.zdsj.affiliate.PddLinkParser
 import com.zdsj.affiliate.Platform
 import com.zdsj.affiliate.jd.JdUnionClient
@@ -67,17 +67,21 @@ class VeapiProvider(
         val shareTitle = JdLinkParser.extractShareTitle(linkText)
 
         JdLinkParser.extractItemId(linkText)?.takeIf { it.all(Char::isDigit) }?.let { sku ->
-            fetchJdItem(sku)?.let { return attachShareMeta(it, shareUrl, shareTitle) }
+            fetchJdItem(sku, shareTitle)?.takeIf { JdSearchRemedy.hasPrice(it) }
+                ?.let { return attachShareMeta(it, shareUrl, shareTitle) }
         }
 
         if (shareUrl != null) {
             resolveSkuFromShortUrl(shareUrl)?.let { sku ->
-                fetchJdItem(sku)?.let { return attachShareMeta(it, shareUrl, shareTitle) }
+                fetchJdItem(sku, shareTitle)?.takeIf { JdSearchRemedy.hasPrice(it) }
+                    ?.let { return attachShareMeta(it, shareUrl, shareTitle) }
             }
         }
 
         if (!shareTitle.isNullOrBlank()) {
-            searchByShareTitle(shareTitle, shareUrl)?.let { return it }
+            val numericSku = JdLinkParser.extractItemId(linkText)?.takeIf { it.all(Char::isDigit) }
+                ?: shareUrl?.let { resolveSkuFromShortUrl(it) }
+            searchByShareTitle(shareTitle, shareUrl, numericSku)?.let { return it }
         }
         return null
     }
@@ -98,11 +102,9 @@ class VeapiProvider(
         return null
     }
 
-    private fun searchByShareTitle(shareTitle: String, shareUrl: String?): AffiliateItem? {
-        val queries = listOfNotNull(shareTitle, KeywordDegrader.degrade(shareTitle)).distinct()
-        for (keyword in queries) {
-            val picked = JdGoodsMatcher.pickBest(shareTitle, jdSearch(keyword, 8)) ?: continue
-            if (!JdGoodsMatcher.matchesShareTitle(shareTitle, picked)) continue
+    private fun searchByShareTitle(shareTitle: String, shareUrl: String?, numericSku: String? = null): AffiliateItem? {
+        for (keyword in JdSearchRemedy.recallKeywords(shareTitle, numericSku)) {
+            val picked = JdSearchRemedy.pickPricedMatch(shareTitle, jdSearch(keyword, 8)) ?: continue
             return attachShareMeta(picked, shareUrl, shareTitle)
         }
         return null
@@ -129,10 +131,37 @@ class VeapiProvider(
 
     // ---- JD ----
 
-    private fun fetchJdItem(itemId: String): AffiliateItem? {
+    /**
+     * 数字 SKU 查价：promotiongoodsinfo（官方常 403）→ jd_search 补救。
+     * @param shareTitle 可选，用于搜索匹配与品牌+型号召回
+     */
+    private fun fetchJdItem(itemId: String, shareTitle: String? = null): AffiliateItem? {
         if (!itemId.all { it.isDigit() }) return null
-        val data = client.get("/jd/promotiongoodsinfo", mapOf("skuIds" to itemId)) ?: return null
-        return listNodes(data).firstNotNullOfOrNull { mapper.mapJdPromotionGoods(it) }
+
+        val fromPromo = client.get("/jd/promotiongoodsinfo", mapOf("skuIds" to itemId))
+            ?.let { listNodes(it).firstNotNullOfOrNull { node -> mapper.mapJdPromotionGoods(node) } }
+        if (fromPromo != null && JdSearchRemedy.hasPrice(fromPromo)) return fromPromo
+
+        return searchJdForSku(itemId, shareTitle) ?: fromPromo
+    }
+
+    /** promotiongoodsinfo 不可用时的 jd_search 补救 */
+    private fun searchJdForSku(numericSku: String, shareTitle: String?): AffiliateItem? {
+        for (keyword in JdSearchRemedy.recallKeywords(shareTitle, numericSku)) {
+            val hits = jdSearch(keyword, 8)
+            val picked = when {
+                !shareTitle.isNullOrBlank() -> JdSearchRemedy.pickPricedMatch(shareTitle, hits)
+                else -> JdSearchRemedy.pickPricedBySku(hits, numericSku)
+            } ?: continue
+            return attachNumericSkuMeta(picked, numericSku)
+        }
+        return null
+    }
+
+    private fun attachNumericSkuMeta(item: AffiliateItem, numericSku: String): AffiliateItem {
+        val meta = item.couponInfo.toMutableMap()
+        meta["_jdSkuId"] = numericSku
+        return item.copy(couponInfo = meta)
     }
 
     private fun jdSearch(keyword: String, limit: Int): List<AffiliateItem> {
@@ -143,18 +172,61 @@ class VeapiProvider(
         return listNodes(data).mapNotNull { mapper.mapJdSearchGoods(it) }
     }
 
+    /**
+     * 维易京东单品转链：jd_prombyuid + sceneId=2 + unionId（必填）。
+     * 见 https://www.veapi.cn/apidoc/jingdonglianmeng/217
+     */
     private fun buildJdLink(ctx: AffiliateContext, itemId: String): String? {
-        val params = mutableMapOf(
-            "materialId" to "https://item.jd.com/$itemId.html",
-            "sceneId" to "1",
-        )
+        if (!itemId.all { it.isDigit() }) return null
+        val unionId = veapi.jd.unionId.takeIf { it.isNotBlank() }
+            ?: props.jd.unionId.takeIf { it.isNotBlank() }
+        if (unionId == null) return null
+
+        val sceneId = veapi.jd.sceneId.coerceIn(1, 2)
+        val materials = if (sceneId == 2) {
+            listOf(
+                "https://item.jd.com/$itemId.html",
+                itemId,
+            )
+        } else {
+            listOf("https://jingfen.jd.com/detail/$itemId.html")
+        }
+
+        for (material in materials) {
+            val params = mutableMapOf(
+                "materialId" to material,
+                "unionId" to unionId,
+                "sceneId" to sceneId.toString(),
+                "chainType" to veapi.jd.chainType.coerceIn(1, 3).toString(),
+            )
+            attachVeapiJdAuth(params, ctx)
+            val data = client.get("/jd/jd_prombyuid", params) ?: continue
+            pickJdPromoUrl(data, itemId)?.let { return it }
+        }
+        return null
+    }
+
+    private fun attachVeapiJdAuth(params: MutableMap<String, String>, ctx: AffiliateContext) {
+        veapi.jd.positionId.takeIf { it.isNotBlank() }?.let { params["positionId"] = it }
+        veapi.jd.sessionkey.takeIf { it.isNotBlank() }?.let { params["sessionkey"] = it }
         if (ctx.authMode == AuthMode.PUBLIC) {
-            veapi.jd.sessionkey.takeIf { it.isNotBlank() }?.let { params["sessionkey"] = it }
-            veapi.jd.positionId.takeIf { it.isNotBlank() }?.let { params["positionId"] = it }
             veapi.jd.unionId.takeIf { it.isNotBlank() }?.let { params["pid"] = it }
         }
-        val data = client.get("/jd/prombysubuid", params) ?: return null
-        return data.path("shortURL").asText(null) ?: data.path("clickURL").asText(null)
+    }
+
+    private fun pickJdPromoUrl(data: JsonNode, skuId: String): String? {
+        if (data.path("trans_type").asInt(-1) == 0) return null
+        val skuFromApi = data.path("skuId").asText(null)?.takeIf { it.all(Char::isDigit) }
+        if (skuFromApi != null && skuFromApi != skuId) return null
+        val click = data.path("clickURL").asText(null)
+        val short = data.path("shortURL").asText(null)
+        // chainType=1 时长链 clickURL，优先用于直达商品详情
+        if (click != null && (click.contains(skuId) || click.contains("item.jd.com/$skuId") || skuFromApi == skuId)) {
+            return click
+        }
+        if (data.path("trans_type").asInt(0) == 1 && click != null) return click
+        if (skuFromApi == skuId) return click ?: short
+        return null
     }
 
     // ---- PDD ----

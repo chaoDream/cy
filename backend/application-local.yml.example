@@ -20,8 +20,10 @@ zdsj:
       secret: YOUR_VEAPI_SECRET   # 可选，与会员中心一致时填写
       jd:
         auth-mode: self
-        union-id: YOUR_JD_UNION_ID
-        # position-id: YOUR_JD_POSITION_ID
+        union-id: YOUR_JD_UNION_ID      # 维易 jd_prombyuid 必填，与京东联盟媒体 ID 一致
+        position-id: YOUR_JD_POSITION_ID  # 推广位，建议配置以便跟单
+        scene-id: 2                       # 单品转链：item.jd.com/数字SKU（需联盟 sceneId=2 权限）
+        chain-type: 1                     # 1=长链 clickURL，2=短链 u.jd.com
       pdd:
         auth-mode: self
         pid: YOUR_PDD_PID

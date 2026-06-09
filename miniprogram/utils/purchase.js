@@ -9,12 +9,12 @@
 
 const dbg = require('./privacy-debug');
 
-const GUIDE = {
-  cps: '联盟推广链接已复制。请打开京东/拼多多 App，在顶部搜索框粘贴并访问。',
-  product_page: '商品页链接已复制。请打开京东 App，在搜索框粘贴链接后访问。',
-  share_url: '分享链接已复制。请打开京东 App，在搜索框粘贴链接后访问。',
-  default: '链接已复制，请打开对应购物 App 粘贴访问。',
-};
+function buildPurchaseGuide(link, linkType) {
+  if (linkType === 'product_page' || /item\.jd\.com/i.test(link || '')) {
+    return '链接已复制。用手机浏览器打开，或发到微信文件传输助手后点击，即可进入商品详情页。';
+  }
+  return '链接已复制。用手机浏览器打开，或发到微信后点击，即可进入商品页。';
+}
 
 function markPrivacyAgreed() {
   const app = getApp();
@@ -23,23 +23,24 @@ function markPrivacyAgreed() {
   }
 }
 
-function showCopySuccessGuide(linkType) {
+function showCopySuccessGuide(link, linkType, platform) {
   wx.showToast({ title: '复制成功', icon: 'success', duration: 2000 });
   setTimeout(() => {
     wx.showModal({
       title: '去购买',
-      content: GUIDE[linkType] || GUIDE.default,
+      content: buildPurchaseGuide(link, linkType),
       showCancel: false,
       confirmText: '知道了',
     });
   }, 400);
 }
 
-function openCopyLinkPage(link, reason, linkType) {
+function openCopyLinkPage(link, reason, linkType, platform) {
   const q = [
     `url=${encodeURIComponent(link)}`,
     `reason=${encodeURIComponent(reason || '')}`,
     `linkType=${encodeURIComponent(linkType || '')}`,
+    `platform=${encodeURIComponent(platform || '')}`,
   ].join('&');
   wx.navigateTo({ url: `/packageA/pages/copy-link/copy-link?${q}` });
 }
@@ -64,18 +65,18 @@ function parseCopyError(err) {
   return { type: 'other', text: raw || '复制失败', raw };
 }
 
-function handleCopyFail(link, linkType, parsed, context) {
+function handleCopyFail(link, linkType, platform, parsed, context) {
   dbg.push('copyFail', { context, type: parsed.type, raw: parsed.raw });
   // 后台未声明剪贴板：弹窗无意义，直接进手动复制页
   if (parsed.type === 'not_declared') {
     wx.showToast({ title: '请手动复制链接', icon: 'none', duration: 2000 });
-    setTimeout(() => openCopyLinkPage(link, parsed.text, linkType || 'default'), 300);
+    setTimeout(() => openCopyLinkPage(link, parsed.text, linkType || 'default', platform), 300);
     return;
   }
-  showCopyFailModal(link, linkType, parsed, context);
+  showCopyFailModal(link, linkType, platform, parsed, context);
 }
 
-function showCopyFailModal(link, linkType, parsed, context) {
+function showCopyFailModal(link, linkType, platform, parsed, context) {
   const type = linkType || 'default';
   const recent = dbg.getRecentLogText();
   const detail = [
@@ -91,34 +92,34 @@ function showCopyFailModal(link, linkType, parsed, context) {
     confirmText: '查看链接',
     cancelText: '取消',
     success: (res) => {
-      if (res.confirm) openCopyLinkPage(link, parsed.text, type);
+      if (res.confirm) openCopyLinkPage(link, parsed.text, type, platform);
     },
   });
 }
 
 /** 授权通过后写剪贴板 */
-function writeClipboardDirect(link, linkType) {
+function writeClipboardDirect(link, linkType, platform) {
   const type = linkType || 'default';
-  dbg.push('setClipboardData.start', { len: (link || '').length, type });
+  dbg.push('setClipboardData.start', { len: (link || '').length, type, platform });
   wx.setClipboardData({
     data: link,
     success: () => {
       dbg.push('setClipboardData.success');
       markPrivacyAgreed();
-      showCopySuccessGuide(type);
+      showCopySuccessGuide(link, type, platform);
     },
     fail: (err) => {
       const parsed = parseCopyError(err);
       dbg.push('setClipboardData.fail', parsed.raw);
-      handleCopyFail(link, type, parsed, 'setClipboardData');
+      handleCopyFail(link, type, platform, parsed, 'setClipboardData');
     },
   });
 }
 
 /** 先走隐私授权，再复制 */
-function requestClipboardCopy(link, linkType) {
+function requestClipboardCopy(link, linkType, platform) {
   const type = linkType || 'default';
-  const runCopy = () => writeClipboardDirect(link, type);
+  const runCopy = () => writeClipboardDirect(link, type, platform);
 
   if (typeof wx.requirePrivacyAuthorize !== 'function') {
     dbg.push('requirePrivacyAuthorize.unsupported');
@@ -135,15 +136,16 @@ function requestClipboardCopy(link, linkType) {
     fail: (err) => {
       const parsed = parseCopyError(err);
       dbg.push('requirePrivacyAuthorize.fail', parsed.raw);
-      openCopyLinkPage(link, parsed.text || '用户拒绝隐私授权', type);
+      openCopyLinkPage(link, parsed.text || '用户拒绝隐私授权', type, platform);
     },
   });
 }
 
 /**
  * 复制购买链接（商品分析页「去购买」入口）。
+ * @param {string} [platform] jd | pdd，用于展示正确打开方式
  */
-function copyPurchaseLink(link, linkType) {
+function copyPurchaseLink(link, linkType, platform) {
   if (!link) {
     wx.showToast({ title: '暂无购买链接', icon: 'none' });
     return;
@@ -151,17 +153,17 @@ function copyPurchaseLink(link, linkType) {
   const type = linkType || 'default';
   const app = getApp();
   if (app && app.globalData) {
-    app.globalData.pendingPurchase = { link, linkType: type };
+    app.globalData.pendingPurchase = { link, linkType: type, platform: platform || '' };
     app.globalData.clipboardDebugLog = [];
   }
-  dbg.push('copyPurchaseLink.start', { type, linkPreview: link.slice(0, 60) });
+  dbg.push('copyPurchaseLink.start', { type, platform, linkPreview: link.slice(0, 60) });
   if (typeof wx.getPrivacySetting === 'function') {
     wx.getPrivacySetting({
       success: (res) => dbg.push('getPrivacySetting', res),
       fail: (err) => dbg.push('getPrivacySetting.fail', dbg.formatErr(err)),
     });
   }
-  requestClipboardCopy(link, type);
+  requestClipboardCopy(link, type, platform);
 }
 
 function copyLinkDirect(link) {
@@ -190,4 +192,5 @@ module.exports = {
   openCopyLinkPage,
   parseCopyError,
   requestClipboardCopy,
+  buildPurchaseGuide,
 };

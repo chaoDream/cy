@@ -1,26 +1,33 @@
-const { copyPurchaseLink } = require('../../../utils/purchase');
+const { copyPurchaseLink, buildPurchaseGuide } = require('../../../utils/purchase');
 
 Page({
   data: {
     link: '',
     reason: '',
     linkType: '',
+    platform: '',
+    tip: '',
   },
 
   onLoad(query) {
+    const link = decodeURIComponent(query.url || '');
+    const linkType = decodeURIComponent(query.linkType || '');
+    const platform = decodeURIComponent(query.platform || '');
     this.setData({
-      link: decodeURIComponent(query.url || ''),
+      link,
       reason: decodeURIComponent(query.reason || ''),
-      linkType: decodeURIComponent(query.linkType || ''),
+      linkType,
+      platform,
+      tip: buildPurchaseGuide(link, linkType),
     });
   },
 
   onCopyTap() {
-    const { link, linkType } = this.data;
+    const { link, linkType, platform } = this.data;
     if (!link) {
       wx.showToast({ title: '链接为空', icon: 'none' });
       return;
     }
-    copyPurchaseLink(link, linkType || 'default');
+    copyPurchaseLink(link, linkType || 'default', platform);
   },
 });

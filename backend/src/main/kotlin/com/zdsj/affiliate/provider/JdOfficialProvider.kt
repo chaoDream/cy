@@ -46,7 +46,7 @@ class JdOfficialProvider(
     }
 
     override fun buildCpsLink(ctx: AffiliateContext, itemId: String): String? =
-        jdUnionService.buildCpsLink("https://item.jd.com/$itemId.html")
+        jdUnionService.buildCpsLink(itemId)
 
     private fun guardRate() {
         if (!rateLimiter.tryAcquire("jd", maxPerWindow = 600, window = Duration.ofMinutes(1))) {

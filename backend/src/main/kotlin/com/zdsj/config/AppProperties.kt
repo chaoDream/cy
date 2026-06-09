@@ -73,6 +73,10 @@ data class AffiliateProperties(
         /** CPS 归因：你自己的联盟媒体 ID */
         val unionId: String = "",
         val positionId: String = "",
+        /** 京东单品转链场景：2=item.jd.com/数字SKU（需联盟 sceneId=2 权限） */
+        val sceneId: Int = 2,
+        /** 1=长链 clickURL，2=短链 u.jd.com，3=长短都返回（维易 jd_prombyuid） */
+        val chainType: Int = 1,
     )
 
     data class VeapiPdd(
