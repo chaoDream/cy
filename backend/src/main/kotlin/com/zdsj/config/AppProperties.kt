@@ -106,7 +106,7 @@ data class AiProperties(
     val mock: Boolean = true,
     val baseUrl: String = "https://api.deepseek.com/v1",
     val apiKey: String = "",
-    val modelHigh: String = "deepseek-v4-pro",
+    val modelHigh: String = "deepseek-v4-flash",
     val modelFast: String = "deepseek-v4-flash",
 )
 

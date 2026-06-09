@@ -98,7 +98,7 @@ zdsj:
     mock: ${AI_MOCK:true}
     base-url: ${AI_BASE_URL:https://api.deepseek.com/v1}
     api-key: ${AI_API_KEY:}
-    model-high: ${AI_MODEL_HIGH:deepseek-v4-pro}
+    model-high: ${AI_MODEL_HIGH:deepseek-v4-flash}
     model-fast: ${AI_MODEL_FAST:deepseek-v4-flash}
   watch:
     # 漏斗轮询频率（cron）

@@ -26,9 +26,14 @@
     </view>
   </view>
 
-  <!-- 2. AI 购买结论 -->
+  <!-- 2. AI 购买结论（独立加载，不阻塞首屏） -->
   <view class="card-plain">
-    <ai-conclusion rec="{{data.aiRecommendation}}" />
+    <ai-conclusion
+      loading="{{aiLoading}}"
+      rec="{{aiRecommendation}}"
+      error="{{aiError}}"
+      bind:retry="onRetryAi"
+    />
   </view>
 
   <!-- 3. 当前参考到手价 -->

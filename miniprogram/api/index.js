@@ -5,12 +5,22 @@ module.exports = {
   parseLink: (linkText) =>
     request({ url: '/api/link/parse', method: 'POST', data: { linkText }, showLoading: true }),
 
-  // 商品分析（PRD §11.2）。uid 透传用于拼多多比价预判（登录用户）
+  // 商品分析核心数据（不含 AI）。uid 透传用于拼多多比价预判（登录用户）
   analysis: (platform, itemId, assets, uid) =>
     request({
       url: `/api/product/analysis?platform=${platform}&item_id=${itemId}&assets=${encodeURIComponent(
         JSON.stringify(assets || {}),
       )}${uid ? `&uid=${encodeURIComponent(uid)}` : ''}`,
+      method: 'GET',
+      auth: false,
+    }),
+
+  // AI 购买建议（与 analysis 并行加载）；forceRule=true 时跳过大模型，仅规则推理
+  aiRecommendation: (platform, itemId, assets, forceRule = false) =>
+    request({
+      url: `/api/product/ai-recommendation?platform=${platform}&item_id=${itemId}&assets=${encodeURIComponent(
+        JSON.stringify(assets || {}),
+      )}${forceRule ? '&force_rule=true' : ''}`,
       method: 'GET',
       auth: false,
     }),

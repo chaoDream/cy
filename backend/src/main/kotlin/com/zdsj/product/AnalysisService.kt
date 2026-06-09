@@ -18,6 +18,7 @@ import com.zdsj.price.PriceTrend
 import com.zdsj.price.UserAssets
 import com.zdsj.config.AffiliateProperties
 import com.zdsj.sku.SkuService
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
 
@@ -30,16 +31,26 @@ data class ParseResult(
     val parseStatus: String,
 )
 
-/** 商品分析结果（PRD §11.2 / §7.3 顺序） */
-data class AnalysisResult(
+/** 商品分析核心结果（不含 AI，首屏快速返回） */
+data class AnalysisCoreResult(
     val productInfo: Map<String, Any?>,
     val skuInfo: Map<String, Any?>,
     val priceInfo: FinalPriceResult,
     val trendInfo: PriceTrend,
     val riskInfo: List<String>,
-    val aiRecommendation: AiResult,
     val crossPlatform: List<Map<String, Any?>>,
     val cpsLink: String?,
+)
+
+private data class PreparedAnalysis(
+    val platform: Platform,
+    val item: AffiliateItem,
+    val rawId: Long,
+    val sku: com.zdsj.product.ProductSku?,
+    val mapping: com.zdsj.product.ProductMapping,
+    val priceResult: FinalPriceResult,
+    val trend: PriceTrend,
+    val riskTags: List<String>,
 )
 
 @Service
@@ -54,6 +65,7 @@ class AnalysisService(
     private val mappingRepo: ProductMappingRepository,
     private val rawRepo: ProductRawRepository,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
 
     /** POST /api/link/parse —— 解析链接/淘口令/分享文本 */
     fun parseLink(linkText: String): ParseResult {
@@ -85,69 +97,81 @@ class AnalysisService(
         )
     }
 
-    /** GET /api/product/analysis —— 组装核心转化页所需全部数据 */
-    fun analyze(platformCode: String, itemId: String, assets: UserAssets, userKey: String? = null): AnalysisResult {
+    /** GET /api/product/analysis —— 核心数据（价格/趋势/风险/跨平台），不含 AI */
+    fun analyze(platformCode: String, itemId: String, assets: UserAssets, userKey: String? = null): AnalysisCoreResult {
+        val ctx = prepareAnalysis(platformCode, itemId, assets)
+        val cross = crossPlatform(ctx.platform, ctx.sku, ctx.item, assets, userKey)
+        val purchase = resolvePurchaseLink(ctx.platform, ctx.item, userKey)
+        return toCoreResult(ctx, cross, purchase)
+    }
+
+    /** GET /api/product/ai-recommendation —— AI 购买建议（独立加载，不阻塞首屏） */
+    fun aiRecommendation(
+        platformCode: String,
+        itemId: String,
+        assets: UserAssets,
+        forceRule: Boolean = false,
+    ): AiResult {
+        val ctx = prepareAnalysis(platformCode, itemId, assets)
+        val input = toAiInput(ctx)
+        if (forceRule) return aiService.ruleBasedRecommendation(input)
+        return runCatching { aiService.analyze(skuId = ctx.sku?.id, input = input) }
+            .getOrElse { e ->
+                log.warn("AI 推荐接口异常，降级到规则推理: {}", e.message)
+                aiService.ruleBasedRecommendation(input)
+            }
+    }
+
+    private fun prepareAnalysis(platformCode: String, itemId: String, assets: UserAssets): PreparedAnalysis {
         val platform = Platform.fromCode(platformCode)
             ?: throw BizException(ErrorCode.PLATFORM_UNSUPPORTED, "不支持的平台")
         val item = resolveAffiliateItem(platform, itemId)
-
         val raw = ingestService.upsert(item)
         val (sku, mapping) = skuService.resolveAndPersist(raw.id!!, item)
-
-        // 1. 到手价（规则引擎）
         val priceResult = priceEngine.compute(item, assets)
-        // 价格快照：第一天就攒
         priceService.recordSnapshot(raw.id!!, sku?.id, platform.code, priceResult)
-
-        // 2. 趋势 + 先涨后降
         val trend = priceService.trend(sku?.id, priceResult.estimatedFinalPrice)
-
-        // 3. 风险标签（SKU 解析 + 店铺类型）
         val riskTags = mapping.riskTags.toMutableList()
         if (item.shopType == "thirdparty" && riskTags.none { it.contains("第三方") }) {
             riskTags += "第三方店铺"
         }
-
-        // 4. AI 建议（事实全部来自上面的工具输出）
-        val ai = aiService.analyze(
-            skuId = sku?.id,
-            input = AiInput(
-                title = item.title,
-                standardSku = sku?.standardName,
-                platform = platform.code,
-                shopType = item.shopType,
-                currentFinalPrice = priceResult.estimatedFinalPrice,
-                low30 = trend.low30,
-                low90 = trend.low90,
-                nearLow = trend.nearLow,
-                fakeDiscount = trend.fakeDiscount,
-                riskTags = riskTags,
-                discountBreakdown = priceResult.included.map { "${it.name} -${it.amount}" },
-            ),
-        )
-
-        // 5. 跨平台同款对比
-        val cross = crossPlatform(platform, sku, item, assets, userKey)
-        val purchase = resolvePurchaseLink(platform, item, userKey)
-
-        return AnalysisResult(
-            productInfo = productInfoMap(item) + mapOf(
-                "rawProductId" to raw.id,
-                "purchaseLinkType" to purchase.second,
-            ),
-            skuInfo = mapOf(
-                "standardName" to (sku?.standardName ?: item.title),
-                "confidence" to mapping.confidence,
-                "needConfirm" to (mapping.confidence == "low"),
-            ),
-            priceInfo = priceResult,
-            trendInfo = trend,
-            riskInfo = riskTags,
-            aiRecommendation = ai,
-            crossPlatform = cross,
-            cpsLink = purchase.first,
-        )
+        return PreparedAnalysis(platform, item, raw.id!!, sku, mapping, priceResult, trend, riskTags)
     }
+
+    private fun toAiInput(ctx: PreparedAnalysis) = AiInput(
+        title = ctx.item.title,
+        standardSku = ctx.sku?.standardName,
+        platform = ctx.platform.code,
+        shopType = ctx.item.shopType,
+        currentFinalPrice = ctx.priceResult.estimatedFinalPrice,
+        low30 = ctx.trend.low30,
+        low90 = ctx.trend.low90,
+        nearLow = ctx.trend.nearLow,
+        fakeDiscount = ctx.trend.fakeDiscount,
+        riskTags = ctx.riskTags,
+        discountBreakdown = ctx.priceResult.included.map { "${it.name} -${it.amount}" },
+    )
+
+    private fun toCoreResult(
+        ctx: PreparedAnalysis,
+        cross: List<Map<String, Any?>>,
+        purchase: Pair<String?, String>,
+    ) = AnalysisCoreResult(
+        productInfo = productInfoMap(ctx.item) + mapOf(
+            "rawProductId" to ctx.rawId,
+            "purchaseLinkType" to purchase.second,
+        ),
+        skuInfo = mapOf(
+            "standardName" to (ctx.sku?.standardName ?: ctx.item.title),
+            "confidence" to ctx.mapping.confidence,
+            "needConfirm" to (ctx.mapping.confidence == "low"),
+        ),
+        priceInfo = ctx.priceResult,
+        trendInfo = ctx.trend,
+        riskInfo = ctx.riskTags,
+        crossPlatform = cross,
+        cpsLink = purchase.first,
+    )
 
     /**
      * 购买链接：优先联盟 CPS 短链；失败或 mock 时回落商品页/分享链（须在京东 App 可打开）。

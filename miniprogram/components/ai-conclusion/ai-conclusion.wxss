@@ -1,3 +1,54 @@
+.ai-skeleton {
+  border-radius: 20rpx;
+  padding: 28rpx;
+  background: linear-gradient(135deg, #e8eaed, #f2f3f5);
+}
+.ai-skel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
+.ai-skel-line {
+  height: 28rpx;
+  border-radius: 8rpx;
+  background: rgba(255, 255, 255, 0.7);
+  margin-bottom: 16rpx;
+  animation: ai-pulse 1.2s ease-in-out infinite;
+}
+.ai-skel-title { width: 180rpx; height: 40rpx; }
+.ai-skel-conf { width: 160rpx; }
+.ai-skel-reason { width: 100%; }
+.ai-skel-reason.short { width: 72%; }
+.ai-skel-hint {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #8a9099;
+}
+@keyframes ai-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+.ai-error {
+  border-radius: 20rpx;
+  padding: 28rpx;
+  background: #f7f8fa;
+  text-align: center;
+}
+.ai-error-text {
+  display: block;
+  font-size: 26rpx;
+  color: #8a9099;
+}
+.ai-error-retry {
+  display: inline-block;
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  color: #ff6b35;
+}
+
 .ai-card {
   border-radius: 20rpx;
   padding: 28rpx;

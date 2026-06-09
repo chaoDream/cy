@@ -52,26 +52,40 @@ class AiAnalysisService(
         val cacheKey = "ai:analysis:${input.platform}:${skuId ?: input.title.hashCode()}:${input.currentFinalPrice}"
         readCache(cacheKey)?.let { return it }
 
-        val result = resolveRecommendation(input)
+        val result = try {
+            resolveRecommendation(input)
+        } catch (e: Exception) {
+            log.warn("AI 建议生成异常，降级到规则推理: {}", e.message)
+            ruleBased(input)
+        }
 
-        recordRepo.save(
-            AiAnalysisRecord(
-                skuId = skuId,
-                platform = input.platform,
-                inputJson = mutableMapOf(
-                    "title" to input.title,
-                    "currentFinalPrice" to input.currentFinalPrice,
-                    "low30" to input.low30,
-                    "low90" to input.low90,
-                    "riskTags" to input.riskTags,
-                ),
-                conclusion = result.conclusion,
-                reasons = result.reasons.toMutableList(),
-                confidence = result.confidence,
-            ),
-        )
+        persistBestEffort(skuId, input, result)
         writeCache(cacheKey, result)
         return result
+    }
+
+    /** 跳过 LLM，直接返回规则推理结论（供接口失败兜底）。 */
+    fun ruleBasedRecommendation(input: AiInput): AiResult = ruleBased(input)
+
+    private fun persistBestEffort(skuId: Long?, input: AiInput, result: AiResult) {
+        runCatching {
+            recordRepo.save(
+                AiAnalysisRecord(
+                    skuId = skuId,
+                    platform = input.platform,
+                    inputJson = mutableMapOf(
+                        "title" to input.title,
+                        "currentFinalPrice" to input.currentFinalPrice,
+                        "low30" to input.low30,
+                        "low90" to input.low90,
+                        "riskTags" to input.riskTags,
+                    ),
+                    conclusion = result.conclusion,
+                    reasons = result.reasons.toMutableList(),
+                    confidence = result.confidence,
+                ),
+            )
+        }.onFailure { log.warn("AI 记录写入失败（不影响返回）: {}", it.message) }
     }
 
     @Suppress("UNCHECKED_CAST")

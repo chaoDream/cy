@@ -28,9 +28,10 @@ Page({
     platformText: '',
     shopTypeText: '',
     crossView: [],
-    // 同款是否可直接购买（拼多多比价预判命中时为 false，引导看更优选择）
     sameItemBuyable: true,
-    // 盯价弹窗状态
+    aiLoading: true,
+    aiRecommendation: null,
+    aiError: '',
     watchModal: { show: false },
   },
 
@@ -41,9 +42,19 @@ Page({
   },
 
   _load() {
-    this.setData({ loading: true, error: '' });
+    const { platform, itemId } = this.data;
+    const assets = app.getAssets();
+    const uid = getUserId();
+    this.setData({
+      loading: true,
+      error: '',
+      aiLoading: true,
+      aiRecommendation: null,
+      aiError: '',
+    });
+    this._loadAi(platform, itemId, assets);
     api
-      .analysis(this.data.platform, this.data.itemId, app.getAssets(), getUserId())
+      .analysis(platform, itemId, assets, uid)
       .then((res) => prepareImageForDisplay(res.productInfo && res.productInfo.imageUrl).then((img) => {
         if (res.productInfo) {
           res.productInfo.imageUrl = img;
@@ -79,6 +90,27 @@ Page({
       .catch((err) => {
         this.setData({ loading: false, error: err.message || '加载失败' });
       });
+  },
+
+  _loadAi(platform, itemId, assets, forceRule = false) {
+    api
+      .aiRecommendation(platform, itemId, assets, forceRule)
+      .then((rec) => {
+        this.setData({ aiLoading: false, aiRecommendation: rec, aiError: '' });
+      })
+      .catch(() => {
+        if (!forceRule) {
+          this._loadAi(platform, itemId, assets, true);
+          return;
+        }
+        this.setData({ aiLoading: false, aiError: '购买建议暂时无法获取' });
+      });
+  },
+
+  onRetryAi() {
+    const { platform, itemId } = this.data;
+    this.setData({ aiLoading: true, aiError: '' });
+    this._loadAi(platform, itemId, app.getAssets(), false);
   },
 
   onPriceExpand() {

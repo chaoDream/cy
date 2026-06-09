@@ -2,6 +2,7 @@ package com.zdsj.product
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.zdsj.common.ApiResponse
+import com.zdsj.ai.AiResult
 import com.zdsj.price.UserAssets
 import jakarta.validation.constraints.NotBlank
 import org.springframework.web.bind.annotation.GetMapping
@@ -31,7 +32,7 @@ class ProductController(
 
     /**
      * GET /api/product/analysis?platform=&item_id=&assets=
-     * assets 为 JSON 字符串（小程序把省钱资产库勾选透传），游客可不带。
+     * 核心分析数据（价格/趋势/风险/跨平台），不含 AI 建议。
      */
     @GetMapping("/analysis")
     fun analysis(
@@ -39,11 +40,25 @@ class ProductController(
         @RequestParam("item_id") itemId: String,
         @RequestParam(required = false) assets: String?,
         @RequestParam(required = false) uid: String?,
-    ): ApiResponse<AnalysisResult> {
+    ): ApiResponse<AnalysisCoreResult> {
         val userAssets = parseAssets(assets)
-        // 登录用户透传 uid → 拼多多 custom_parameters，用于比价预判；游客为 null
         val userKey = com.zdsj.affiliate.pdd.PddCustomParams.of(uid)
         return ApiResponse.ok(analysisService.analyze(platform, itemId, userAssets, userKey))
+    }
+
+    /**
+     * GET /api/product/ai-recommendation?platform=&item_id=&assets=
+     * AI 购买建议，与 analysis 并行请求，不阻塞首屏。
+     */
+    @GetMapping("/ai-recommendation")
+    fun aiRecommendation(
+        @RequestParam platform: String,
+        @RequestParam("item_id") itemId: String,
+        @RequestParam(required = false) assets: String?,
+        @RequestParam(required = false, defaultValue = "false") forceRule: Boolean,
+    ): ApiResponse<AiResult> {
+        val userAssets = parseAssets(assets)
+        return ApiResponse.ok(analysisService.aiRecommendation(platform, itemId, userAssets, forceRule))
     }
 
     @GetMapping("/search")

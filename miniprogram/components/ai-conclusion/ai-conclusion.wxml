@@ -1,4 +1,19 @@
-<view class="ai-card {{themeMap[rec.conclusion]}}" wx:if="{{rec}}">
+<view wx:if="{{loading}}" class="ai-skeleton">
+  <view class="ai-skel-head">
+    <view class="ai-skel-line ai-skel-title"></view>
+    <view class="ai-skel-line ai-skel-conf"></view>
+  </view>
+  <view class="ai-skel-line ai-skel-reason"></view>
+  <view class="ai-skel-line ai-skel-reason short"></view>
+  <text class="ai-skel-hint">AI 正在分析购买建议…</text>
+</view>
+
+<view wx:elif="{{error}}" class="ai-error">
+  <text class="ai-error-text">{{error}}</text>
+  <text class="ai-error-retry" bindtap="onRetry">点击重试</text>
+</view>
+
+<view wx:elif="{{rec}}" class="ai-card {{themeMap[rec.conclusion]}}">
   <view class="ai-head">
     <text class="ai-label">{{rec.conclusionLabel}}</text>
     <text class="ai-conf">AI 置信度 {{rec.confidence}}</text>
