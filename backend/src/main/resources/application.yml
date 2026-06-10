@@ -121,6 +121,22 @@ zdsj:
       - name: "vivo X200 Pro 512GB 国行"
         platforms: [jd, pdd]
         enabled: false                   # 示例：单条停用
+  subsidy:
+    # 政府国补规则表（无实时 API，按地区维护；以当地政策与名额为准）
+    # region 需与用户资产库 govSubsidyRegion 精确匹配；rate=比例，cap=封顶(元)，min-price=享补门槛(元)
+    enabled: ${GOV_SUBSIDY_ENABLED:false}
+    regions:
+      - region: "上海市"
+        rate: 0.15
+        cap: 2000
+        min-price: 0
+      - region: "江苏省"
+        rate: 0.15
+        cap: 1500
+      - region: "广东省"
+        rate: 0.10
+        cap: 1000
+        enabled: false              # 示例：单条停用
   avatar:
     storage-dir: ${AVATAR_STORAGE_DIR:./data/avatars}
     public-path-prefix: /static/avatars

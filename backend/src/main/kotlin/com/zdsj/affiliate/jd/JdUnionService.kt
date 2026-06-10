@@ -164,13 +164,29 @@ class JdUnionService(
         val title = node.path("skuName").asText(null) ?: node.path("goodsName").asText(null)
         if (title.isNullOrBlank()) return null
 
-        val price = node.path("priceInfo").path("price").decimalOrNull()
+        val priceInfo = node.path("priceInfo")
+        val price = priceInfo.path("price").decimalOrNull()
             ?: node.path("lowestPrice").decimalOrNull()
             ?: node.path("price").decimalOrNull()
             ?: BigDecimal.ZERO
 
-        val coupon = node.path("couponInfo").path("couponList").firstOrNull()
-        val couponAmount = coupon?.path("discount")?.decimalOrNull() ?: BigDecimal.ZERO
+        // 价格瀑布：price ≥ lowestPrice（活动裸价）≥ lowestCouponPrice（券后价），见 JdPriceMath
+        val coupons = node.path("couponInfo").path("couponList").map {
+            JdPriceMath.Coupon(
+                quota = it.path("quota").decimalOrNull() ?: BigDecimal.ZERO,
+                discount = it.path("discount").decimalOrNull() ?: BigDecimal.ZERO,
+                couponType = it.path("couponType").asInt(0),
+            )
+        }
+        val pricing = JdPriceMath.compute(
+            price = price,
+            lowestPriceRaw = priceInfo.path("lowestPrice").decimalOrNull(),
+            lowestPriceType = priceInfo.path("lowestPriceType").asInt(node.path("lowestPriceType").asInt(0)),
+            lowestCouponPriceRaw = priceInfo.path("lowestCouponPrice").decimalOrNull(),
+            officialDiscount = priceInfo.path("discount").decimalOrNull()
+                ?: node.path("discount").decimalOrNull() ?: BigDecimal.ZERO,
+            coupons = coupons,
+        )
 
         val shopType = when (node.path("owner").asText("")) {
             "g" -> "self"
@@ -178,7 +194,10 @@ class JdUnionService(
         }
         val tags = buildList {
             if (shopType == "self") add("京东自营")
-            if (couponAmount > BigDecimal.ZERO) add("券${couponAmount.stripTrailingZeros().toPlainString()}元")
+            if (pricing.priceTag.isNotBlank()) add(pricing.priceTag)
+            if (pricing.couponDeduction > BigDecimal.ZERO) {
+                add("券${pricing.couponDeduction.stripTrailingZeros().toPlainString()}元")
+            }
             node.path("skuTagList").forEach { add(it.asText()) }
         }
 
@@ -189,11 +208,16 @@ class JdUnionService(
             imageUrl = node.path("imageInfo").path("imageList").firstOrNull()?.path("url")?.asText(null),
             shopName = node.path("shopInfo").path("shopName").asText(null),
             shopType = shopType,
-            rawPrice = price,
-            couponInfo = mapOf("platformCoupon" to couponAmount, "shopCoupon" to BigDecimal.ZERO),
-            subsidyAmount = node.path("priceInfo").path("lowestCouponPrice").decimalOrNull()?.let { lcp ->
-                (price - lcp).coerceAtLeast(BigDecimal.ZERO)
-            } ?: BigDecimal.ZERO,
+            rawPrice = pricing.displayPrice,
+            couponInfo = mapOf(
+                "platformCoupon" to pricing.singleCoupon,
+                "shopCoupon" to pricing.shopCoupon,
+                "promoDiscount" to pricing.promoDiscount,
+                "priceTag" to pricing.priceTag,
+                "priceTagType" to pricing.priceTagType,
+            ),
+            // 活动/券已在 couponInfo 拆项，不再用 price−lowestCouponPrice 反推（会重复扣减）
+            subsidyAmount = BigDecimal.ZERO,
             freight = BigDecimal.ZERO,
             activityTags = tags,
             sourceUrl = node.path("materialUrl").asText(null),

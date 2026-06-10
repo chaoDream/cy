@@ -1,6 +1,7 @@
 package com.zdsj.price
 
 import com.zdsj.affiliate.AffiliateItem
+import com.zdsj.config.GovSubsidyProperties
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -53,7 +54,9 @@ data class FinalPriceResult(
  * 公式：标价 − 平台券 − 店铺券 − 跨店满减 − 补贴 −（资产库）会员价/国补 +（运费）
  */
 @Service
-class PriceEngine {
+class PriceEngine(
+    private val subsidyProps: GovSubsidyProperties = GovSubsidyProperties(),
+) {
 
     fun compute(item: AffiliateItem, assets: UserAssets): FinalPriceResult {
         val display = item.rawPrice
@@ -63,7 +66,11 @@ class PriceEngine {
         val shopCoupon = bd(item.couponInfo["shopCoupon"])
         val crossShop = bd(item.couponInfo["crossShop"])
         val subsidy = item.subsidyAmount
+        // 活动优惠（京东价格瀑布 price−lowestPrice，秒杀/拼购/会员/大促），名称随促销类型
+        val promoDiscount = bd(item.couponInfo["promoDiscount"])
+        val promoType = (item.couponInfo["priceTagType"] as? Number)?.toInt() ?: 0
 
+        if (promoDiscount > BigDecimal.ZERO) included += DiscountItem(promoName(promoType), promoDiscount, true)
         if (platformCoupon > BigDecimal.ZERO) included += DiscountItem("平台券", platformCoupon, true)
         if (shopCoupon > BigDecimal.ZERO) included += DiscountItem("店铺券", shopCoupon, true)
         if (crossShop > BigDecimal.ZERO) included += DiscountItem("跨店满减", crossShop, true)
@@ -77,7 +84,7 @@ class PriceEngine {
         if (govSubsidy.amount > BigDecimal.ZERO) included += govSubsidy
 
         val totalCoupon = platformCoupon + shopCoupon + crossShop
-        val totalDiscount = totalCoupon + subsidy + memberDiscount.amount + govSubsidy.amount
+        val totalDiscount = totalCoupon + promoDiscount + subsidy + memberDiscount.amount + govSubsidy.amount
 
         val finalPrice = (display - totalDiscount + item.freight)
             .max(BigDecimal.ZERO)
@@ -89,7 +96,12 @@ class PriceEngine {
         )
 
         val uncertaintyFlags = buildList {
-            if (assets.vip88 || assets.jdPlus || assets.pddMonthly) add("会员价为自申报估算")
+            // lowestPriceType==3 的专享价通常需 PLUS 会员，非会员提示（不改变计算口径）
+            if (promoDiscount > BigDecimal.ZERO && promoType == 3 && !assets.jdPlus) {
+                add("专享价通常需 PLUS 会员，非会员到手价可能略高")
+            }
+            if (promoDiscount > BigDecimal.ZERO && promoType == 2) add("秒杀/拼购价需抢购或成团")
+            if (memberDiscount.amount > BigDecimal.ZERO) add("会员价以平台实际核验为准")
             if (govSubsidy.amount > BigDecimal.ZERO) add("国补以当地政策与名额为准")
         }
 
@@ -105,28 +117,55 @@ class PriceEngine {
         )
     }
 
+    /** 活动优惠明细名称（lowestPriceType：3 专享/PLUS、2 秒杀拼购、4 粉丝/预售） */
+    private fun promoName(type: Int): String = when (type) {
+        3 -> "PLUS专享优惠"
+        2 -> "秒杀/拼购优惠"
+        4 -> "粉丝专享优惠"
+        else -> "大促活动优惠"
+    }
+
+    /**
+     * 会员专属优惠：用联盟接口返回的真实会员价（couponInfo.memberPrice）计算，
+     * 而非估算。优惠额 = 标价 − 会员价，仅当用户持有对应会员（memberType 匹配）时计入。
+     * 接口未返回会员价时该项为 0、不展示。
+     */
     private fun memberDiscount(item: AffiliateItem, assets: UserAssets, display: BigDecimal): DiscountItem {
-        // 示例规则：会员可叠加约 1% 专属优惠（真实接入后按平台返回的会员价覆盖）
-        val rate = when (item.platform) {
-            "jd" -> if (assets.jdPlus) BigDecimal("0.01") else BigDecimal.ZERO
-            "pdd" -> if (assets.pddMonthly) BigDecimal("0.01") else BigDecimal.ZERO
-            else -> if (assets.vip88) BigDecimal("0.01") else BigDecimal.ZERO
+        val memberType = item.couponInfo["memberType"] as? String
+        val memberPrice = bd(item.couponInfo["memberPrice"])
+        val userHasMembership = when (memberType) {
+            "jdPlus" -> assets.jdPlus
+            "pddMonthly" -> assets.pddMonthly
+            "vip88" -> assets.vip88
+            else -> false
         }
-        val amount = (display * rate).setScale(2, RoundingMode.HALF_UP)
-        val name = when {
-            item.platform == "jd" && assets.jdPlus -> "京东PLUS专属"
-            item.platform == "pdd" && assets.pddMonthly -> "省钱月卡专属"
-            assets.vip88 -> "88VIP专属"
+        val name = when (memberType) {
+            "jdPlus" -> "京东PLUS专属"
+            "pddMonthly" -> "省钱月卡专属"
+            "vip88" -> "88VIP专属"
             else -> "会员专属"
         }
+        if (!userHasMembership || memberPrice <= BigDecimal.ZERO || memberPrice >= display) {
+            return DiscountItem(name, BigDecimal.ZERO, true)
+        }
+        val amount = (display - memberPrice).setScale(2, RoundingMode.HALF_UP)
         return DiscountItem(name, amount, true)
     }
 
+    /**
+     * 政府国补：查 zdsj.subsidy 地区规则表（无实时 API，由运营维护）。
+     * 优惠额 = min(标价 × 比例, 封顶)，标价低于门槛或地区未配置时为 0。
+     */
     private fun govSubsidy(assets: UserAssets, display: BigDecimal): DiscountItem {
-        if (assets.govSubsidyRegion.isNullOrBlank()) return DiscountItem("国补", BigDecimal.ZERO, true)
-        // 示例：国补常见 15% 封顶 500（实际以地方政策为准）
-        val amount = (display * BigDecimal("0.15")).min(BigDecimal("500")).setScale(2, RoundingMode.HALF_UP)
-        return DiscountItem("${assets.govSubsidyRegion}国补", amount, true)
+        val region = assets.govSubsidyRegion
+        val rule = subsidyProps.match(region)
+            ?: return DiscountItem(region?.let { "${it}国补" } ?: "国补", BigDecimal.ZERO, true)
+        if (rule.minPrice > BigDecimal.ZERO && display < rule.minPrice) {
+            return DiscountItem("${rule.region}国补", BigDecimal.ZERO, true)
+        }
+        var amount = (display * rule.rate).setScale(2, RoundingMode.HALF_UP)
+        if (rule.cap > BigDecimal.ZERO) amount = amount.min(rule.cap)
+        return DiscountItem("${rule.region}国补", amount, true)
     }
 
     private fun bd(v: Any?): BigDecimal = when (v) {

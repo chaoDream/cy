@@ -3,6 +3,7 @@ package com.zdsj.affiliate.veapi
 import com.fasterxml.jackson.databind.JsonNode
 import com.zdsj.affiliate.AffiliateItem
 import com.zdsj.affiliate.Platform
+import com.zdsj.affiliate.jd.JdPriceMath
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
@@ -40,19 +41,34 @@ class VeapiMapper {
         )
     }
 
-    /** 京东搜索（/jd/jd_search）节点 */
+    /** 京东搜索（/jd/jd_search）节点；价格瀑布与官方 goods.query 同构，见 JdPriceMath */
     fun mapJdSearchGoods(node: JsonNode): AffiliateItem? {
         val itemId = node.path("skuId").asText(null)?.takeIf { it.isNotBlank() }
             ?: node.path("itemId").asText(null)
         val title = node.path("skuName").asText(null)?.takeIf { it.isNotBlank() }
-        val price = node.path("priceInfo").path("lowestCouponPrice").positiveDecimalOrNull()
-            ?: node.path("priceInfo").path("lowestPrice").positiveDecimalOrNull()
-            ?: node.path("priceInfo").path("price").positiveDecimalOrNull()
+        val priceInfo = node.path("priceInfo")
+        val price = priceInfo.path("price").positiveDecimalOrNull()
+            ?: priceInfo.path("lowestPrice").positiveDecimalOrNull()
+            ?: priceInfo.path("lowestCouponPrice").positiveDecimalOrNull()
             ?: BigDecimal.ZERO
         val image = node.path("imageInfo").path("imageList").firstUrl()
             ?: node.path("imageInfo").path("whiteImage").asText(null)
-        val couponAmount = node.path("couponList").firstOrNull()
-            ?.path("discount")?.positiveDecimalOrNull() ?: BigDecimal.ZERO
+        val coupons = node.path("couponList").map {
+            JdPriceMath.Coupon(
+                quota = it.path("quota").positiveDecimalOrNull() ?: BigDecimal.ZERO,
+                discount = it.path("discount").positiveDecimalOrNull() ?: BigDecimal.ZERO,
+                couponType = it.path("couponType").asInt(0),
+            )
+        }
+        val pricing = JdPriceMath.compute(
+            price = price,
+            lowestPriceRaw = priceInfo.path("lowestPrice").positiveDecimalOrNull(),
+            lowestPriceType = priceInfo.path("lowestPriceType").asInt(node.path("lowestPriceType").asInt(0)),
+            lowestCouponPriceRaw = priceInfo.path("lowestCouponPrice").positiveDecimalOrNull(),
+            officialDiscount = priceInfo.path("discount").positiveDecimalOrNull()
+                ?: node.path("discount").positiveDecimalOrNull() ?: BigDecimal.ZERO,
+            coupons = coupons,
+        )
         val shopType = if (node.path("owner").asText("") == "g") "self" else "thirdparty"
         return build(
             platform = Platform.JD,
@@ -61,12 +77,19 @@ class VeapiMapper {
             imageUrl = image,
             shopName = node.path("shopInfo").path("shopName").asText(null),
             shopType = shopType,
-            rawPrice = price,
-            coupon = couponAmount,
+            rawPrice = pricing.displayPrice,
+            couponInfo = mapOf(
+                "platformCoupon" to pricing.singleCoupon,
+                "shopCoupon" to pricing.shopCoupon,
+                "promoDiscount" to pricing.promoDiscount,
+                "priceTag" to pricing.priceTag,
+                "priceTagType" to pricing.priceTagType,
+            ),
             sourceUrl = node.path("materialUrl").asText(null),
             tags = buildList {
                 if (shopType == "self") add("京东自营")
-                if (couponAmount > BigDecimal.ZERO) add("券${couponAmount.plain()}元")
+                if (pricing.priceTag.isNotBlank()) add(pricing.priceTag)
+                if (pricing.couponDeduction > BigDecimal.ZERO) add("券${pricing.couponDeduction.plain()}元")
             },
             context = "jd_search",
         )
@@ -117,6 +140,7 @@ class VeapiMapper {
         shopType: String,
         rawPrice: BigDecimal,
         coupon: BigDecimal = BigDecimal.ZERO,
+        couponInfo: Map<String, Any?>? = null,
         sourceUrl: String?,
         tags: List<String>,
         context: String,
@@ -133,7 +157,7 @@ class VeapiMapper {
             shopName = shopName,
             shopType = shopType,
             rawPrice = rawPrice,
-            couponInfo = mapOf("platformCoupon" to coupon, "shopCoupon" to BigDecimal.ZERO),
+            couponInfo = couponInfo ?: mapOf("platformCoupon" to coupon, "shopCoupon" to BigDecimal.ZERO),
             subsidyAmount = BigDecimal.ZERO,
             freight = BigDecimal.ZERO,
             activityTags = tags.ifEmpty { listOf("维易") },

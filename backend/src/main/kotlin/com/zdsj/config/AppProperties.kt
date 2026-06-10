@@ -1,6 +1,7 @@
 package com.zdsj.config
 
 import org.springframework.boot.context.properties.ConfigurationProperties
+import java.math.BigDecimal
 
 @ConfigurationProperties(prefix = "zdsj.jwt")
 data class JwtProperties(
@@ -99,6 +100,34 @@ data class AffiliateProperties(
         val emptyTtlSeconds: Long = 45,
         val searchTtlSeconds: Long = 120,
     )
+}
+
+/**
+ * 政府国补规则表（按地区维护，PRD §5.1 资产库国补）。
+ * 国补无实时 API，由运营在 application.yml 维护各地区比例/封顶/门槛。
+ */
+@ConfigurationProperties(prefix = "zdsj.subsidy")
+data class GovSubsidyProperties(
+    val enabled: Boolean = false,
+    val regions: List<Region> = emptyList(),
+) {
+    data class Region(
+        /** 与 user_profile.assets 中 govSubsidyRegion 精确匹配 */
+        val region: String = "",
+        /** 补贴比例，如 0.15 表示 15% */
+        val rate: BigDecimal = BigDecimal.ZERO,
+        /** 封顶金额（元）；<=0 表示不封顶 */
+        val cap: BigDecimal = BigDecimal.ZERO,
+        /** 享补价格门槛（元）：标价低于此值不补；<=0 表示无门槛 */
+        val minPrice: BigDecimal = BigDecimal.ZERO,
+        val enabled: Boolean = true,
+    )
+
+    /** 命中地区规则；未开启 / 无地区 / 未配置时返回 null */
+    fun match(region: String?): Region? {
+        if (!enabled || region.isNullOrBlank()) return null
+        return regions.firstOrNull { it.enabled && it.region == region }
+    }
 }
 
 @ConfigurationProperties(prefix = "zdsj.ai")
