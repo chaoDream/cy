@@ -5,6 +5,7 @@ import com.zdsj.common.ErrorCode
 import com.zdsj.price.PriceEngine
 import com.zdsj.price.PriceService
 import com.zdsj.price.UserAssets
+import com.zdsj.product.ProductImageStorageService
 import com.zdsj.product.ProductIngestService
 import com.zdsj.product.ProductMappingRepository
 import com.zdsj.product.ProductRaw
@@ -30,6 +31,7 @@ class WatchService(
     private val priceService: PriceService,
     private val priceEngine: PriceEngine,
     private val ingestService: ProductIngestService,
+    private val imageStorage: ProductImageStorageService,
     private val userService: UserService,
     private val userRepo: AppUserRepository,
 ) {
@@ -54,6 +56,7 @@ class WatchService(
         }
         val raw = rawRepo.findById(rawProductId)
             .orElseThrow { BizException(ErrorCode.NOT_FOUND, "商品不存在") }
+        raw.id?.let { imageStorage.persistIfAbsentAsync(it) }
         val resolvedSkuId = skuId ?: mappingRepo.findByRawProductId(rawProductId).map { it.skuId }.orElse(null)
         // 当前价存「到手价」而非挂牌价，与列表「当前到手价」语义一致；算不出时回退挂牌价
         val currentPrice = estimateFinalPrice(userId, raw)

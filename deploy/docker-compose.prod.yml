@@ -48,6 +48,7 @@ services:
         condition: service_healthy
     volumes:
       - avatar_data:/data/avatars
+      - product_image_data:/data/product-images
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-zdsj}
@@ -74,6 +75,7 @@ services:
       AI_MODEL_HIGH: ${AI_MODEL_HIGH:-deepseek-v4-flash}
       AI_MODEL_FAST: ${AI_MODEL_FAST:-deepseek-v4-flash}
       AVATAR_STORAGE_DIR: /data/avatars
+      PRODUCT_IMAGE_STORAGE_DIR: /data/product-images
     networks:
       - internal
 
@@ -91,6 +93,7 @@ services:
       - ./nginx/snippets:/etc/nginx/conf.d/snippets:ro
       - ./certs:/etc/nginx/certs:ro
       - avatar_data:/data/avatars:ro
+      - product_image_data:/data/product-images:ro
     networks:
       - internal
 
@@ -102,3 +105,4 @@ volumes:
   pgdata:
   redisdata:
   avatar_data:
+  product_image_data:

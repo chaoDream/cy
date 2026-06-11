@@ -32,6 +32,9 @@ class ProductRaw(
     @Column(name = "platform_item_id") var platformItemId: String = "",
     var title: String = "",
     @Column(name = "image_url") var imageUrl: String? = null,
+    /** 本地落盘后的访问路径，如 /static/products/jd/1000123.jpg */
+    @Column(name = "local_image_path") var localImagePath: String? = null,
+    @Column(name = "image_stored_at") var imageStoredAt: OffsetDateTime? = null,
     @Column(name = "shop_name") var shopName: String? = null,
     @Column(name = "shop_type") var shopType: String? = null,
     @Column(name = "raw_price") var rawPrice: BigDecimal? = null,

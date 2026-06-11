@@ -2,7 +2,10 @@ package com.zdsj.rank
 
 import com.zdsj.common.ApiResponse
 import com.zdsj.price.PriceSnapshotRepository
+import com.zdsj.affiliate.ProductImageUrls
+import com.zdsj.product.ProductImageStorageService
 import com.zdsj.product.ProductMappingRepository
+import com.zdsj.product.ProductRaw
 import com.zdsj.product.ProductRawRepository
 import com.zdsj.product.ProductSkuRepository
 import org.springframework.stereotype.Service
@@ -22,6 +25,7 @@ class RankService(
     private val skuRepo: ProductSkuRepository,
     private val mappingRepo: ProductMappingRepository,
     private val rawRepo: ProductRawRepository,
+    private val imageStorage: ProductImageStorageService,
 ) {
     fun phoneRank(brand: String?, priceMin: BigDecimal?, priceMax: BigDecimal?): List<Map<String, Any?>> {
         val recent = snapshotRepo.findTop200ByOrderByCapturedAtDesc()
@@ -40,11 +44,7 @@ class RankService(
                 val mappings = mappingRepo.findBySkuId(skuId)
                 val riskTags = mappings.flatMap { it.riskTags }.distinct()
                 val raw = rawRepo.findById(best.rawProductId).orElse(null)
-                // 最低价那条可能没图，从同款其它链接兜底取一张有图的
-                val imageUrl = raw?.imageUrl?.takeIf { it.isNotBlank() }
-                    ?: mappings.asSequence()
-                        .mapNotNull { rawRepo.findById(it.rawProductId).orElse(null)?.imageUrl }
-                        .firstOrNull { it.isNotBlank() }
+                val imageRaw = pickImageRaw(raw, mappings)
                 mapOf(
                     "skuId" to skuId,
                     "standardName" to sku.standardName,
@@ -53,7 +53,7 @@ class RankService(
                     "platform" to best.platform,
                     "rawProductId" to best.rawProductId,
                     "platformItemId" to raw?.platformItemId,
-                    "imageUrl" to imageUrl,
+                    "imageUrl" to imageRaw?.let { imageStorage.displayUrl(it) },
                     "title" to raw?.title,
                     "riskTags" to riskTags,
                     "capturedAt" to best.capturedAt.toString(),
@@ -61,6 +61,20 @@ class RankService(
             }
             .sortedBy { it["bestFinalPrice"] as BigDecimal }
     }
+
+    /** 最低价那条可能没图，从同款其它链接兜底取一张有图的 */
+    private fun pickImageRaw(primary: ProductRaw?, mappings: List<com.zdsj.product.ProductMapping>): ProductRaw? {
+        val candidates = buildList {
+            primary?.let { add(it) }
+            mappings.forEach { m ->
+                rawRepo.findById(m.rawProductId).orElse(null)?.let { add(it) }
+            }
+        }
+        return candidates.firstOrNull { hasDisplayableImage(it) }
+    }
+
+    private fun hasDisplayableImage(raw: ProductRaw): Boolean =
+        imageStorage.localFileExists(raw.localImagePath) || ProductImageUrls.isLoadable(raw.imageUrl)
 }
 
 @RestController

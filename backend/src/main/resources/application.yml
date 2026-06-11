@@ -142,6 +142,11 @@ zdsj:
     public-path-prefix: /static/avatars
     max-bytes: 512000
     download-timeout-seconds: 10
+  product-image:
+    storage-dir: ${PRODUCT_IMAGE_STORAGE_DIR:./data/product-images}
+    public-path-prefix: /static/products
+    max-bytes: 1048576
+    download-timeout-seconds: 15
 
 logging:
   level:

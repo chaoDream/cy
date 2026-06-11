@@ -45,7 +45,7 @@ data class AnalysisCoreResult(
 private data class PreparedAnalysis(
     val platform: Platform,
     val item: AffiliateItem,
-    val rawId: Long,
+    val raw: ProductRaw,
     val sku: com.zdsj.product.ProductSku?,
     val mapping: com.zdsj.product.ProductMapping,
     val priceResult: FinalPriceResult,
@@ -64,6 +64,7 @@ class AnalysisService(
     private val aiService: AiAnalysisService,
     private val mappingRepo: ProductMappingRepository,
     private val rawRepo: ProductRawRepository,
+    private val imageStorage: ProductImageStorageService,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -92,7 +93,7 @@ class AnalysisService(
             platform = platform.code,
             itemId = priced.platformItemId,
             rawProductId = raw.id!!,
-            productInfo = productInfoMap(priced),
+            productInfo = productInfoMap(raw, priced),
             parseStatus = "success",
         )
     }
@@ -135,7 +136,7 @@ class AnalysisService(
         if (item.shopType == "thirdparty" && riskTags.none { it.contains("第三方") }) {
             riskTags += "第三方店铺"
         }
-        return PreparedAnalysis(platform, item, raw.id!!, sku, mapping, priceResult, trend, riskTags)
+        return PreparedAnalysis(platform, item, raw, sku, mapping, priceResult, trend, riskTags)
     }
 
     private fun toAiInput(ctx: PreparedAnalysis) = AiInput(
@@ -157,8 +158,8 @@ class AnalysisService(
         cross: List<Map<String, Any?>>,
         purchase: Pair<String?, String>,
     ) = AnalysisCoreResult(
-        productInfo = productInfoMap(ctx.item) + mapOf(
-            "rawProductId" to ctx.rawId,
+        productInfo = productInfoMap(ctx.raw, ctx.item) + mapOf(
+            "rawProductId" to ctx.raw.id,
             "purchaseLinkType" to purchase.second,
         ),
         skuInfo = mapOf(
@@ -226,7 +227,7 @@ class AnalysisService(
                 "itemId" to item.platformItemId,
                 "rawProductId" to raw.id,
                 "title" to item.title,
-                "imageUrl" to item.imageUrl,
+                "imageUrl" to imageStorage.displayUrl(raw),
                 "rawPrice" to item.rawPrice,
             )
         }
@@ -434,20 +435,15 @@ class AnalysisService(
         return kw.any { title.contains(it, ignoreCase = true) }
     }
 
-    private fun productInfoMap(item: AffiliateItem): Map<String, Any?> = mapOf(
+    private fun productInfoMap(raw: ProductRaw, item: AffiliateItem): Map<String, Any?> = mapOf(
         "platform" to item.platform,
         "itemId" to item.platformItemId,
         "title" to item.title,
-        "imageUrl" to productImageProxy(item.platform, item.platformItemId),
+        "imageUrl" to imageStorage.displayUrl(raw),
         "shopName" to item.shopName,
         "shopType" to item.shopType,
         "rawPrice" to item.rawPrice,
         "activityTags" to item.activityTags,
         "sourceUrl" to item.sourceUrl,
     )
-
-    private fun productImageProxy(platform: String, itemId: String): String {
-        val encoded = java.net.URLEncoder.encode(itemId, Charsets.UTF_8)
-        return "/api/product/image?platform=$platform&item_id=$encoded"
-    }
 }

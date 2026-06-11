@@ -10,7 +10,10 @@ import java.time.OffsetDateTime
  * 将联盟返回的商品落库为 product_raw（upsert），供后续 SKU 映射 / 价格快照引用。
  */
 @Service
-class ProductIngestService(private val rawRepo: ProductRawRepository) {
+class ProductIngestService(
+    private val rawRepo: ProductRawRepository,
+    private val imageStorage: ProductImageStorageService,
+) {
 
     @Transactional
     fun upsert(item: AffiliateItem): ProductRaw {
@@ -27,7 +30,9 @@ class ProductIngestService(private val rawRepo: ProductRawRepository) {
         entity.activityTags = item.activityTags.toMutableList()
         entity.sourceUrl = item.sourceUrl
         entity.updatedAt = OffsetDateTime.now()
-        return rawRepo.save(entity)
+        val saved = rawRepo.save(entity)
+        saved.id?.let { imageStorage.persistIfAbsentAsync(it) }
+        return saved
     }
 
     fun toAffiliateItem(raw: ProductRaw): AffiliateItem = AffiliateItem(

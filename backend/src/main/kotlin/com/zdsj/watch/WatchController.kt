@@ -1,6 +1,7 @@
 package com.zdsj.watch
 
 import com.zdsj.common.ApiResponse
+import com.zdsj.product.ProductImageStorageService
 import com.zdsj.product.ProductRawRepository
 import com.zdsj.user.currentUserId
 import jakarta.servlet.http.HttpServletRequest
@@ -28,6 +29,7 @@ data class WatchRemoveRequest(val watchId: Long = 0)
 class WatchController(
     private val watchService: WatchService,
     private val rawRepo: ProductRawRepository,
+    private val imageStorage: ProductImageStorageService,
 ) {
 
     @PostMapping("/create")
@@ -55,7 +57,7 @@ class WatchController(
                 "platform" to raw?.platform,
                 "platformItemId" to raw?.platformItemId,
                 "title" to raw?.title,
-                "imageUrl" to raw?.imageUrl,
+                "imageUrl" to raw?.let { imageStorage.displayUrl(it) },
                 "originalPrice" to raw?.rawPrice,
                 "targetPrice" to it.targetPrice,
                 "currentPrice" to it.currentPrice,

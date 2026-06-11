@@ -4,6 +4,7 @@ import com.zdsj.affiliate.Platform
 import com.zdsj.affiliate.ProductImageUrls
 import com.zdsj.affiliate.jd.JdImageResolver
 import com.zdsj.affiliate.provider.AffiliateGateway
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -20,8 +21,8 @@ import java.io.ByteArrayOutputStream
 import javax.imageio.ImageIO
 
 /**
- * 商品主图代理：小程序统一走 API 域名加载图片；
- * 有联盟主图则由服务端拉取并回传图片字节（小程序 image 组件不跟 302），否则返回 PNG 占位图。
+ * 商品主图：优先读本地落盘文件；无本地缓存时拉外网并尝试写盘；最后返回 PNG 占位图。
+ * 本接口必须始终返回图片字节，不可抛未捕获异常（否则小程序 downloadFile 收到 JSON 500）。
  */
 @RestController
 @RequestMapping("/api/product")
@@ -29,69 +30,105 @@ class ProductImageController(
     private val rawRepo: ProductRawRepository,
     private val gateway: AffiliateGateway,
     private val jdImageResolver: JdImageResolver,
+    private val imageStorage: ProductImageStorageService,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
     private val restClient = RestClient.create()
 
     @GetMapping("/image")
     fun image(
         @RequestParam platform: String,
         @RequestParam("item_id") itemId: String,
-    ): ResponseEntity<ByteArray> {
-        resolveImageUrl(platform, itemId)?.let { url ->
-            fetchImageBytes(url)?.let { bytes ->
-                return ResponseEntity.ok()
-                    .contentType(guessMediaType(url))
-                    .header(HttpHeaders.CACHE_CONTROL, "public, max-age=3600")
-                    .body(bytes)
-            }
-        }
-        val title = rawRepo.findByPlatformAndPlatformItemId(platform, itemId)
-            .map { it.title }
-            .orElse("商品")
-        return ResponseEntity.ok()
-            .contentType(MediaType.IMAGE_PNG)
-            .body(buildPlaceholderPng(title))
+    ): ResponseEntity<ByteArray> = runCatching {
+        serveImage(platform, itemId)
+    }.getOrElse { e ->
+        log.warn("商品图代理异常 platform={} itemId={} err={}", platform, itemId.take(32), e.message)
+        placeholderResponse("商品")
     }
 
-    private fun resolveImageUrl(platform: String, itemId: String): String? {
-        rawRepo.findByPlatformAndPlatformItemId(platform, itemId)
-            .map { it.imageUrl }
-            .orElse(null)
-            ?.takeIf { ProductImageUrls.isLoadable(it) }
-            ?.let { return it }
+    private fun serveImage(platform: String, itemId: String): ResponseEntity<ByteArray> {
+        val raw = rawRepo.findByPlatformAndPlatformItemId(platform, itemId).orElse(null)
 
-        val p = Platform.fromCode(platform) ?: return null
-        gateway.resolveImage(p, itemId)
-            ?.takeIf { ProductImageUrls.isLoadable(it) }
-            ?.let { return it }
+        readCachedBytes(platform, itemId, raw)?.let { (bytes, mediaType) ->
+            return imageResponse(bytes, mediaType)
+        }
 
-        // 维易/官方均失败时：京东数字 SKU 尝试页面公开主图兜底
-        if (p == Platform.JD && itemId.all { it.isDigit() }) {
-            return jdImageResolver.resolveMainImage(itemId)
-                ?.takeIf { ProductImageUrls.isLoadable(it) }
+        resolveImageUrl(platform, itemId, raw)?.let { url ->
+            val persisted = raw?.let { runCatching { imageStorage.persistFromUrl(it, url) }.getOrNull() }
+            readCachedBytes(platform, itemId, persisted ?: raw)?.let { (bytes, mediaType) ->
+                return imageResponse(bytes, mediaType)
+            }
+            fetchImageBytes(url, platform)?.let { bytes ->
+                raw?.let { runCatching { imageStorage.persistFromUrl(it, url) } }
+                return imageResponse(bytes, guessMediaType(url))
+            }
+        }
+
+        return placeholderResponse(raw?.title ?: "商品")
+    }
+
+    private fun readCachedBytes(platform: String, itemId: String, raw: ProductRaw?): Pair<ByteArray, String>? {
+        imageStorage.readLocalBytes(raw?.localImagePath)?.let {
+            return it to imageStorage.guessMediaType(raw?.localImagePath)
+        }
+        imageStorage.readLocalBytes(platform, itemId)?.let {
+            val path = imageStorage.resolveDiskPath(platform, itemId)
+            return it to imageStorage.guessMediaType(path)
         }
         return null
     }
 
-    private fun fetchImageBytes(url: String): ByteArray? {
+    private fun imageResponse(bytes: ByteArray, mediaType: String): ResponseEntity<ByteArray> =
+        ResponseEntity.ok()
+            .contentType(MediaType.parseMediaType(mediaType))
+            .header(HttpHeaders.CACHE_CONTROL, "public, max-age=86400")
+            .body(bytes)
+
+    private fun placeholderResponse(title: String): ResponseEntity<ByteArray> =
+        ResponseEntity.ok()
+            .contentType(MediaType.IMAGE_PNG)
+            .body(buildPlaceholderPng(title))
+
+    /** 京东数字 SKU 优先走页面公开主图（快），再走联盟 API（慢） */
+    private fun resolveImageUrl(platform: String, itemId: String, raw: ProductRaw?): String? {
+        raw?.imageUrl
+            ?.takeIf { ProductImageUrls.isLoadable(it) }
+            ?.let { return it }
+
+        val p = Platform.fromCode(platform) ?: return null
+        if (p == Platform.JD && itemId.all { it.isDigit() }) {
+            jdImageResolver.resolveMainImage(itemId)
+                ?.takeIf { ProductImageUrls.isLoadable(it) }
+                ?.let { return it }
+        }
+
+        return gateway.resolveImage(p, itemId)
+            ?.takeIf { ProductImageUrls.isLoadable(it) }
+    }
+
+    private fun fetchImageBytes(url: String, platform: String): ByteArray? {
         val normalized = if (url.startsWith("//")) "https:$url" else url
+        val referer = when (platform.lowercase()) {
+            "pdd" -> "https://mobile.yangkeduo.com/"
+            else -> "https://m.jd.com/"
+        }
         return runCatching {
             restClient.get()
                 .uri(normalized)
                 .header("User-Agent", "Mozilla/5.0")
-                .header("Referer", "https://m.jd.com/")
+                .header("Referer", referer)
                 .retrieve()
                 .body(ByteArray::class.java)
         }.getOrNull()?.takeIf { it.isNotEmpty() }
     }
 
-    private fun guessMediaType(url: String): MediaType = when {
-        url.contains(".png", ignoreCase = true) -> MediaType.IMAGE_PNG
-        url.contains(".webp", ignoreCase = true) -> MediaType.parseMediaType("image/webp")
-        else -> MediaType.IMAGE_JPEG
+    private fun guessMediaType(url: String): String = when {
+        url.contains(".png", ignoreCase = true) -> "image/png"
+        url.contains(".webp", ignoreCase = true) -> "image/webp"
+        else -> "image/jpeg"
     }
 
-    private fun buildPlaceholderPng(title: String): ByteArray {
+    private fun buildPlaceholderPng(title: String): ByteArray = runCatching {
         val size = 400
         val img = BufferedImage(size, size, BufferedImage.TYPE_INT_RGB)
         val g = img.createGraphics()
@@ -102,15 +139,15 @@ class ProductImageController(
         g.fillRoundRect(40, 40, 320, 240, 24, 24)
         g.color = Color(0x8A, 0x90, 0x99)
         g.font = Font(Font.SANS_SERIF, Font.PLAIN, 28)
-        g.drawString("暂无主图", 145, 210)
+        g.drawString("No Image", 150, 210)
         g.color = Color(0x4E, 0x59, 0x69)
         g.font = Font(Font.SANS_SERIF, Font.PLAIN, 22)
-        val safe = title.take(10)
+        val safe = title.filter { it.code < 128 }.take(16).ifBlank { "Product" }
         g.drawString(safe, (size - g.fontMetrics.stringWidth(safe)) / 2, 320)
         g.dispose()
-        return ByteArrayOutputStream().use { out ->
+        ByteArrayOutputStream().use { out ->
             ImageIO.write(img, "png", out)
             out.toByteArray()
         }
-    }
+    }.getOrElse { ByteArray(0) }
 }

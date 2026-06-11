@@ -108,4 +108,5 @@ docker compose -f docker-compose.prod.yml down
 - **构建内存**：`docker compose build` 会在容器内跑 Gradle，CVM 建议 ≥4G 内存；若 OOM，可在本地 `./gradlew bootJar` 后改用预构建镜像。
 - **密钥**：`.env` 与 `certs/` 已 gitignore，勿提交仓库。
 - **用户头像**：登录时下载到 Docker 卷 `avatar_data`，Nginx 路径 `/static/avatars/` 静态托管（不经 Spring Boot）。
+- **商品主图**：解析/盯价/采价时按需落盘到 `product_image_data`，Nginx 路径 `/static/products/` 静态托管；外链仍保留在 `product_raw.image_url`。
 - **上线清单**：见仓库 `docs/RELEASE_CHECKLIST.md`。

@@ -41,7 +41,7 @@ rm -rf .gradle build    # 清理项目级缓存与卡住的锁
 ./gradlew bootJar && java -jar build/libs/zdsj-backend-0.1.0-SNAPSHOT.jar
 ```
 
-启动后 Flyway 自动建表（V1 + V2 种子）。健康检查：
+启动后 Flyway 自动建表（V1–V6）。健康检查：
 
 ```bash
 curl http://localhost:8080/api/health
@@ -146,6 +146,12 @@ curl -X POST http://localhost:8080/api/link/parse \
 # 商品分析（带资产库）
 curl 'http://localhost:8080/api/product/analysis?platform=jd&item_id=100012345678&assets=%7B%22jdPlus%22%3Atrue%7D'
 ```
+
+## 商品主图本地缓存
+
+解析链接、商品分析、加入盯价、种子采价时，若联盟返回可加载主图 URL，会自动下载到 `data/product-images/`（生产挂载 Docker 卷 `product_image_data`），数据库 `product_raw.local_image_path` 记录访问路径如 `/static/products/jd/1000123.jpg`。展示优先走 Nginx/Spring 静态路径，失败时仍可由 `/api/product/image` 代理外网。
+
+环境变量：`PRODUCT_IMAGE_STORAGE_DIR`（默认 `./data/product-images`）。
 
 ## 测试
 
