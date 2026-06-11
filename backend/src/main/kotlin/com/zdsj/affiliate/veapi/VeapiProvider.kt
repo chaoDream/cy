@@ -164,12 +164,19 @@ class VeapiProvider(
         return item.copy(couponInfo = meta)
     }
 
+    /**
+     * 京东搜索：京东对「12GB+256GB 国行」这类精确规格后缀常返回 0 条，
+     * 故按 JdSearchRemedy 逐级降级关键词（完整词 → 去规格 → 品牌+型号）重试，命中即返回。
+     * 这样在 Gateway 落到 mock / 触发熔断之前就能拿到真实结果。
+     */
     private fun jdSearch(keyword: String, limit: Int): List<AffiliateItem> {
-        val data = client.get(
-            "/jd/jd_search",
-            mapOf("keyword" to keyword, "pageSize" to limit.coerceIn(1, 30).toString()),
-        ) ?: return emptyList()
-        return listNodes(data).mapNotNull { mapper.mapJdSearchGoods(it) }
+        val pageSize = limit.coerceIn(1, 30).toString()
+        for (kw in JdSearchRemedy.recallKeywords(keyword)) {
+            val data = client.get("/jd/jd_search", mapOf("keyword" to kw, "pageSize" to pageSize)) ?: continue
+            val items = listNodes(data).mapNotNull { mapper.mapJdSearchGoods(it) }
+            if (items.isNotEmpty()) return items
+        }
+        return emptyList()
     }
 
     /**

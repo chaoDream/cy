@@ -1,6 +1,7 @@
 package com.zdsj.price
 
 import com.zdsj.affiliate.AffiliateItem
+import com.zdsj.affiliate.JdSearchRemedy
 import com.zdsj.affiliate.Platform
 import com.zdsj.affiliate.provider.AffiliateGateway
 import org.slf4j.LoggerFactory
@@ -28,9 +29,12 @@ class SeedPriceResolver(
         val key = normalizeSeedName(seedName)
         val binding = bindingRepo.findBySeedNameAndPlatform(key, platform.code).orElse(null)
 
-        if (binding != null) {
+        // 绑定快路：仅当 itemId 为纯数字（可被 fetchItem 直查）时才走。
+        // 维易搜索返回的是 hash itemId，fetchItem 只认数字 id 会失败、还会误触熔断堵死后续搜索，
+        // 故 hash 绑定直接跳过快路重新搜索；并要求查到的商品有价，避免 mock 兜底的 0 价短路。
+        if (binding != null && binding.platformItemId.all { it.isDigit() }) {
             val cached = gateway.fetchItem(platform, binding.platformItemId, bypassCache = true).data
-            if (cached != null) return cached
+            if (cached != null && JdSearchRemedy.hasPrice(cached)) return cached
             log.info("种子绑定失效，重新搜索 seed={} platform={} oldItemId={}", key, platform.code, binding.platformItemId)
         }
 
