@@ -36,16 +36,40 @@ class SeedPricePollingJob(
     /** 每天定时（默认 06:00） */
     @Scheduled(cron = "\${zdsj.price-seed.poll-cron}")
     fun pollDaily() {
+        if (seedProps.enabledItems().filter { it.isNameMode() }.isEmpty()) return
+        val r = runOnce("每日")
+        log.info("种子采价[每日] 完成 共{} 成功{} 失败{} 耗时{}ms", r.total, r.success, r.failed, r.durationMs)
+    }
+
+    /**
+     * 立即执行一次采价（供后台手动触发 / 补采）。返回成功失败统计，不抛异常。
+     */
+    fun runOnce(trigger: String = "手动"): SeedPollResult {
+        val started = System.currentTimeMillis()
         val items = seedProps.enabledItems().filter { it.isNameMode() }
-        if (items.isEmpty()) return
-        log.info("种子采价[每日] 共 {} 个商品名", items.size)
+        log.info("种子采价[{}] 开始 共 {} 个商品名", trigger, items.size)
+        var success = 0
+        var failed = 0
+        val failures = mutableListOf<String>()
         for (seed in items) {
             for (platformCode in seed.platforms) {
-                runCatching { pollByName(seed, platformCode) }.onFailure {
-                    log.warn("种子采价失败 name={} platform={}: {}", seed.name, platformCode, it.message)
-                }
+                runCatching { pollByName(seed, platformCode) }
+                    .onSuccess { success++ }
+                    .onFailure {
+                        failed++
+                        val msg = "${seed.name}/$platformCode: ${it.message}"
+                        if (failures.size < 50) failures.add(msg)
+                        log.warn("种子采价失败 {}", msg)
+                    }
             }
         }
+        return SeedPollResult(
+            total = success + failed,
+            success = success,
+            failed = failed,
+            durationMs = System.currentTimeMillis() - started,
+            failures = failures,
+        )
     }
 
     @Transactional
@@ -70,3 +94,12 @@ class SeedPricePollingJob(
         return priceResult
     }
 }
+
+/** 一次采价的结果汇总（手动触发接口返回用）。 */
+data class SeedPollResult(
+    val total: Int,
+    val success: Int,
+    val failed: Int,
+    val durationMs: Long,
+    val failures: List<String>,
+)

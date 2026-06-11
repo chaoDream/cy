@@ -6,6 +6,13 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "4599", "--directory", "mockups"],
       "port": 4599
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-lc", "cd backend && ./gradlew bootRun --args=--server.port=8081"],
+      "port": 8081,
+      "autoPort": false
     }
   ]
 }

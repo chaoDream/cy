@@ -42,7 +42,16 @@
         data-itemid="{{item.itemId}}"
         bindtap="onRecentTap"
       >
-        <image class="recent-img" src="{{item.imageUrl}}" mode="aspectFill" />
+        <image
+          wx:if="{{item.imageUrl && !item._imgErr}}"
+          class="recent-img"
+          src="{{item.imageUrl}}"
+          mode="aspectFill"
+          lazy-load
+          binderror="onRecentImgError"
+          data-index="{{index}}"
+        />
+        <view wx:else class="recent-img recent-img-placeholder">无图</view>
         <text class="recent-title">{{item.title}}</text>
       </view>
     </view>

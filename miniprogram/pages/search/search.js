@@ -15,25 +15,50 @@ Page({
   },
 
   onLoad() {
-    const recent = (wx.getStorageSync('recentQueries') || []).map((r) => ({
-      ...r,
-      imageUrl: resolveImageUrl(this._toRelativeImage(r.imageUrl)),
+    this.setData({ assets: app.getAssets() });
+    this._loadRecent();
+  },
+
+  /** 历史图存相对路径；展示时按当前 API 地址（真机/远程）重新拼完整 URL */
+  _loadRecent() {
+    const raw = wx.getStorageSync('recentQueries') || [];
+    const normalized = raw.map((r) => ({
+      platform: r.platform,
+      itemId: r.itemId,
+      title: r.title,
+      imageUrl: this._toRelativeImage(r.imageUrl),
     }));
+    // 回写规范化后的相对路径，清掉 storage 里残留的 127.0.0.1 等绝对地址
+    if (normalized.length && JSON.stringify(normalized) !== JSON.stringify(raw)) {
+      wx.setStorageSync('recentQueries', normalized);
+    }
     this.setData({
-      assets: app.getAssets(),
-      recent,
+      recent: normalized.map((r) => ({
+        ...r,
+        imageUrl: resolveImageUrl(r.imageUrl),
+        _imgErr: false,
+      })),
     });
   },
 
-  // 历史记录里可能存了带旧 host 的绝对代理地址（如 127.0.0.1），
-  // 切环境后会失效；把它还原成相对路径，再按当前环境 resolve
   _toRelativeImage(url) {
     if (!url) return '';
     const idx = url.indexOf('/api/product/image');
-    return idx >= 0 ? url.slice(idx) : url;
+    if (idx >= 0) return url.slice(idx);
+    if (/^https?:\/\//i.test(url)) {
+      return url.replace(/^https?:\/\/[^/]+/i, '');
+    }
+    return url;
+  },
+
+  onRecentImgError(e) {
+    const idx = e.currentTarget.dataset.index;
+    if (idx === undefined || idx === null) return;
+    this.setData({ [`recent[${idx}]._imgErr`]: true });
   },
 
   onShow() {
+    this._loadRecent();
     // 剪贴板检测：检测到京东/拼多多链接则提示一键查价（PRD §7.1）
     detectFromClipboard().then((text) => {
       if (text && text !== this.data.linkText) {
@@ -138,7 +163,11 @@ Page({
     const next = stored.slice(0, 10);
     wx.setStorageSync('recentQueries', next);
     this.setData({
-      recent: next.map((r) => ({ ...r, imageUrl: resolveImageUrl(r.imageUrl) })),
+      recent: next.map((r) => ({
+        ...r,
+        imageUrl: resolveImageUrl(r.imageUrl),
+        _imgErr: false,
+      })),
     });
   },
 });
