@@ -27,6 +27,7 @@ Page({
     data: null,
     platformText: '',
     shopTypeText: '',
+    productTags: [],
     crossView: [],
     sameItemBuyable: true,
     aiLoading: true,
@@ -74,11 +75,16 @@ Page({
           res.priceInfo.displayPriceText = displayPrice;
           res.priceInfo.pricePending = pricePending;
         }
+        const productTags = (res.productInfo.activityTags || []).map((t) => ({
+          text: t,
+          gov: /国补/.test(t),
+        }));
         this.setData({
           loading: false,
           data: res,
           platformText: platformName(res.productInfo.platform),
           shopTypeText: shopTypeName(res.productInfo.shopType),
+          productTags,
           crossView,
           sameItemBuyable,
         });

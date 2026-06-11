@@ -63,6 +63,11 @@
   padding: 2rpx 14rpx;
   border-radius: 6rpx;
 }
+.tag-gov {
+  background: #fdecec;
+  color: #e23b3b;
+  font-weight: 600;
+}
 .prod-shop { display: block; }
 .sku-conf { font-size: 22rpx; color: #6b7280; margin-top: 10rpx; }
 .conf { margin-left: 10rpx; padding: 2rpx 10rpx; border-radius: 6rpx; font-size: 20rpx; }

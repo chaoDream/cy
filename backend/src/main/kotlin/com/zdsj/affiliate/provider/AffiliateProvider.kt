@@ -60,7 +60,7 @@ interface AffiliateProvider {
     fun fetchItem(ctx: AffiliateContext, itemId: String): AffiliateItem?
 
     /** 从分享文案拉取（内部识别平台），无法识别返回 null */
-    fun fetchFromShareText(linkText: String): AffiliateItem?
+    fun fetchFromShareText(linkText: String, ctx: AffiliateContext? = null): AffiliateItem?
 
     fun search(ctx: AffiliateContext, keyword: String, limit: Int = 10): List<AffiliateItem>
 

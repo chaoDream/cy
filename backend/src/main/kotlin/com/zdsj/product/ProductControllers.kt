@@ -3,7 +3,10 @@ package com.zdsj.product
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.zdsj.common.ApiResponse
 import com.zdsj.ai.AiResult
+import com.zdsj.affiliate.pdd.PddCustomParams
 import com.zdsj.price.UserAssets
+import com.zdsj.user.JwtService
+import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.constraints.NotBlank
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
@@ -16,11 +19,25 @@ data class LinkParseRequest(@field:NotBlank val linkText: String = "")
 
 @RestController
 @RequestMapping("/api/link")
-class LinkController(private val analysisService: AnalysisService) {
+class LinkController(
+    private val analysisService: AnalysisService,
+    private val jwtService: JwtService,
+) {
 
     @PostMapping("/parse")
-    fun parse(@RequestBody req: LinkParseRequest): ApiResponse<ParseResult> =
-        ApiResponse.ok(analysisService.parseLink(req.linkText))
+    fun parse(
+        @RequestBody req: LinkParseRequest,
+        request: HttpServletRequest,
+    ): ApiResponse<ParseResult> =
+        ApiResponse.ok(analysisService.parseLink(req.linkText, optionalPddUserKey(request)))
+
+    /** 解析接口对游客开放，但若带了有效 token 则传入拼多多 custom_parameters */
+    private fun optionalPddUserKey(request: HttpServletRequest): String? {
+        val header = request.getHeader("Authorization") ?: return null
+        if (!header.startsWith("Bearer ")) return null
+        val userId = jwtService.verify(header.substring(7)) ?: return null
+        return PddCustomParams.of(userId.toString())
+    }
 }
 
 @RestController

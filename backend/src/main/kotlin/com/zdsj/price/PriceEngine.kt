@@ -58,6 +58,13 @@ class PriceEngine(
     private val subsidyProps: GovSubsidyProperties = GovSubsidyProperties(),
 ) {
 
+    private companion object {
+        /** 省份名归一化去除的后缀（长复合在前，确保单遍即可剥净） */
+        val PROVINCE_SUFFIXES = listOf(
+            "维吾尔自治区", "壮族自治区", "回族自治区", "特别行政区", "自治区", "省", "市",
+        )
+    }
+
     fun compute(item: AffiliateItem, assets: UserAssets): FinalPriceResult {
         val display = item.rawPrice
         val included = mutableListOf<DiscountItem>()
@@ -80,10 +87,13 @@ class PriceEngine(
         val memberDiscount = memberDiscount(item, assets, display)
         if (memberDiscount.amount > BigDecimal.ZERO) included += memberDiscount
 
-        val govSubsidy = govSubsidy(assets, display)
+        val totalCoupon = platformCoupon + shopCoupon + crossShop
+        // 国补基数 = 扣除券/活动/平台补贴/会员价后的净价（符合「按最终售价×比例」政策口径，国补置于瀑布末环）
+        val govBase = (display - totalCoupon - promoDiscount - subsidy - memberDiscount.amount)
+            .max(BigDecimal.ZERO)
+        val govSubsidy = govSubsidy(item, assets, govBase)
         if (govSubsidy.amount > BigDecimal.ZERO) included += govSubsidy
 
-        val totalCoupon = platformCoupon + shopCoupon + crossShop
         val totalDiscount = totalCoupon + promoDiscount + subsidy + memberDiscount.amount + govSubsidy.amount
 
         val finalPrice = (display - totalDiscount + item.freight)
@@ -153,19 +163,49 @@ class PriceEngine(
     }
 
     /**
-     * 政府国补：查 zdsj.subsidy 地区规则表（无实时 API，由运营维护）。
-     * 优惠额 = min(标价 × 比例, 封顶)，标价低于门槛或地区未配置时为 0。
+     * 政府国补：优先用联盟接口返回的国补标签（couponInfo.govSubsidy*，比例/封顶/生效省份），
+     * 接口未返回时回落 zdsj.subsidy 地区规则表（由运营维护）。
+     * 优惠额 = min(基数 × 比例, 封顶)，基数为扣券后净价；用户省份不在生效范围或未配置时为 0。
      */
-    private fun govSubsidy(assets: UserAssets, display: BigDecimal): DiscountItem {
+    private fun govSubsidy(item: AffiliateItem, assets: UserAssets, base: BigDecimal): DiscountItem {
         val region = assets.govSubsidyRegion
+        if (region.isNullOrBlank() || base <= BigDecimal.ZERO) {
+            return DiscountItem(region?.let { "${it}国补" } ?: "国补", BigDecimal.ZERO, true)
+        }
+
+        // 平台数据优先：联盟返回 rebate/topDiscount/生效省份
+        val platformRate = bd(item.couponInfo["govSubsidyRate"])
+        if (platformRate > BigDecimal.ZERO) {
+            @Suppress("UNCHECKED_CAST")
+            val provinces = (item.couponInfo["govSubsidyProvinces"] as? List<String>).orEmpty()
+            if (provinces.none { sameProvince(it, region) }) {
+                return DiscountItem("${region}国补", BigDecimal.ZERO, true)
+            }
+            var amount = base * platformRate
+            val cap = bd(item.couponInfo["govSubsidyCap"])
+            if (cap > BigDecimal.ZERO) amount = amount.min(cap)
+            return DiscountItem("${region}国补", amount.setScale(2, RoundingMode.HALF_UP), true)
+        }
+
+        // 回落配置表
         val rule = subsidyProps.match(region)
-            ?: return DiscountItem(region?.let { "${it}国补" } ?: "国补", BigDecimal.ZERO, true)
-        if (rule.minPrice > BigDecimal.ZERO && display < rule.minPrice) {
+            ?: return DiscountItem("${region}国补", BigDecimal.ZERO, true)
+        if (rule.minPrice > BigDecimal.ZERO && base < rule.minPrice) {
             return DiscountItem("${rule.region}国补", BigDecimal.ZERO, true)
         }
-        var amount = (display * rule.rate).setScale(2, RoundingMode.HALF_UP)
+        var amount = base * rule.rate
         if (rule.cap > BigDecimal.ZERO) amount = amount.min(rule.cap)
-        return DiscountItem("${rule.region}国补", amount, true)
+        return DiscountItem("${rule.region}国补", amount.setScale(2, RoundingMode.HALF_UP), true)
+    }
+
+    /** 省份名归一化比较：接口返回短名（天津），资产库存带后缀（天津市），去后缀后比较 */
+    private fun sameProvince(a: String, b: String): Boolean =
+        normalizeProvince(a) == normalizeProvince(b) && normalizeProvince(a).isNotBlank()
+
+    private fun normalizeProvince(s: String): String {
+        var r = s.trim()
+        for (suffix in PROVINCE_SUFFIXES) r = r.removeSuffix(suffix)
+        return r
     }
 
     private fun bd(v: Any?): BigDecimal = when (v) {

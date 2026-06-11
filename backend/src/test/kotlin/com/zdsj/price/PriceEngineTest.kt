@@ -90,6 +90,36 @@ class PriceEngineTest {
     }
 
     @Test
+    fun `国补优先用联盟返回的比例与封顶 省份归一化命中`() {
+        val withGov = item("jd", 5000, 0, 0).copy(
+            couponInfo = mapOf(
+                "govSubsidyRate" to BigDecimal("0.15"),
+                "govSubsidyCap" to BigDecimal("500"),
+                "govSubsidyProvinces" to listOf("天津"),
+                "govSubsidyType" to 9107,
+            ),
+        )
+        // 资产库「天津市」归一化后命中接口「天津」：5000*0.15=750，封顶 500
+        val r = engine.compute(withGov, UserAssets(govSubsidyRegion = "天津市"))
+        val sub = r.included.firstOrNull { it.name.contains("国补") }
+        assertTrue(sub != null && sub.amount == BigDecimal("500.00"))
+    }
+
+    @Test
+    fun `用户省份不在国补生效范围时不计国补`() {
+        val withGov = item("jd", 5000, 0, 0).copy(
+            couponInfo = mapOf(
+                "govSubsidyRate" to BigDecimal("0.15"),
+                "govSubsidyCap" to BigDecimal("500"),
+                "govSubsidyProvinces" to listOf("天津"),
+                "govSubsidyType" to 9107,
+            ),
+        )
+        val r = engine.compute(withGov, UserAssets(govSubsidyRegion = "北京市"))
+        assertTrue(r.included.none { it.name.contains("国补") && it.amount > BigDecimal.ZERO })
+    }
+
+    @Test
     fun `京东特价场景 活动优惠与券分项扣减不重复`() {
         // price 9999；活动优惠500(type3)；单品券100 + 店铺券200 → 到手 9199
         val special = item("jd", 9999, 100, 0).copy(

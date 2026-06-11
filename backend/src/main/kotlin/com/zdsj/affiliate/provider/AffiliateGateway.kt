@@ -59,13 +59,14 @@ class AffiliateGateway(
     }
 
     /** 从分享文案识别平台并拉取（不缓存：入参高基数） */
-    fun fetchFromShareText(linkText: String): AffiliateResult<AffiliateItem> {
+    fun fetchFromShareText(linkText: String, userKey: String? = null): AffiliateResult<AffiliateItem> {
         val platform = detect(linkText)?.first
+        val ctx = platform?.let { contextFor(it, bypassCache = false, userKey = userKey) }
         val order = if (platform != null) providerOrder(platform) else byName.keys.toList()
         var degraded = false
         for ((idx, name) in order.withIndex()) {
             val provider = byName[name] ?: continue
-            val item = runCatching { provider.fetchFromShareText(linkText) }.getOrElse {
+            val item = runCatching { provider.fetchFromShareText(linkText, ctx) }.getOrElse {
                 log.warn("[affiliate] fetchFromShareText 失败 provider={}: {}", name, it.message)
                 degraded = true
                 null

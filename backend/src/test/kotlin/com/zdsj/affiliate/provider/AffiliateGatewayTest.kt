@@ -42,7 +42,7 @@ class AffiliateGatewayTest {
         override fun supports(platform: Platform) = supported
         override fun extractItemId(platform: Platform, linkText: String): String? = null
         override fun fetchItem(ctx: AffiliateContext, itemId: String): AffiliateItem? = resultById(itemId)
-        override fun fetchFromShareText(linkText: String): AffiliateItem? = null
+        override fun fetchFromShareText(linkText: String, ctx: AffiliateContext?): AffiliateItem? = null
         override fun search(ctx: AffiliateContext, keyword: String, limit: Int): List<AffiliateItem> = emptyList()
         override fun buildCpsLink(ctx: AffiliateContext, itemId: String): String? = null
     }

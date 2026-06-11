@@ -12,6 +12,7 @@ import com.zdsj.affiliate.provider.AffiliateContext
 import com.zdsj.affiliate.provider.AffiliateProvider
 import com.zdsj.affiliate.provider.AuthMode
 import com.zdsj.config.AffiliateProperties
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
 /**
@@ -27,6 +28,7 @@ class VeapiProvider(
 ) : AffiliateProvider {
 
     private val veapi get() = props.veapi
+    private val log = LoggerFactory.getLogger(javaClass)
 
     override fun name() = "veapi"
 
@@ -47,12 +49,9 @@ class VeapiProvider(
         Platform.PDD -> fetchPddItem(ctx, itemId)
     }
 
-    override fun fetchFromShareText(linkText: String): AffiliateItem? = when {
+    override fun fetchFromShareText(linkText: String, ctx: AffiliateContext?): AffiliateItem? = when {
         JdLinkParser.isJdShareText(linkText) -> fetchJdFromShare(linkText)
-        PddLinkParser.isPddShareText(linkText) -> {
-            val keyword = PddLinkParser.extractUrl(linkText) ?: PddLinkParser.extractShareTitle(linkText)
-            keyword?.let { pddSearch(it, 1).firstOrNull() }
-        }
+        PddLinkParser.isPddShareText(linkText) -> fetchPddFromShare(linkText, ctx)
         else -> null
     }
 
@@ -238,33 +237,65 @@ class VeapiProvider(
 
     // ---- PDD ----
 
+    private fun fetchPddFromShare(linkText: String, ctx: AffiliateContext?): AffiliateItem? {
+        val pddCtx = ctx ?: AffiliateContext(platform = Platform.PDD, authMode = pddAuthMode())
+        val keywords = buildList {
+            PddLinkParser.extractUrl(linkText)?.let { add(it) }
+            PddLinkParser.extractShareTitle(linkText)?.let { add(it) }
+            PddLinkParser.extractKeyword(linkText)?.let { add(it) }
+        }.distinct().filter { it.isNotBlank() }
+        for (keyword in keywords) {
+            pddSearch(keyword, 1, pddCtx).firstOrNull()?.let { return it }
+        }
+        return null
+    }
+
     private fun fetchPddItem(ctx: AffiliateContext, itemId: String): AffiliateItem? {
         val params = mutableMapOf("goods_sign_list" to itemId)
         if (itemId.all { it.isDigit() }) params["usenumid"] = "1"
-        if (ctx.authMode == AuthMode.PUBLIC) {
-            veapi.pdd.sessionkey.takeIf { it.isNotBlank() }?.let { params["sessionkey"] = it }
-            veapi.pdd.pid.takeIf { it.isNotBlank() }?.let { params["p_id"] = it }
-        }
+        attachVeapiPddParams(params, ctx)
         val data = client.get("/pdd/pdd_goodssearch", params) ?: return null
         return listNodes(data).firstNotNullOfOrNull { mapper.mapPddGoods(it) }
     }
 
-    private fun pddSearch(keyword: String, limit: Int): List<AffiliateItem> {
-        val data = client.get(
-            "/pdd/pdd_goodssearch",
-            mapOf("keyword" to keyword, "page_size" to limit.coerceIn(1, 100).toString()),
-        ) ?: return emptyList()
+    private fun pddSearch(
+        keyword: String,
+        limit: Int,
+        ctx: AffiliateContext = AffiliateContext(platform = Platform.PDD, authMode = pddAuthMode()),
+    ): List<AffiliateItem> {
+        val params = mutableMapOf(
+            "keyword" to keyword,
+            "page_size" to limit.coerceIn(1, 100).toString(),
+        )
+        attachVeapiPddParams(params, ctx)
+        val data = client.get("/pdd/pdd_goodssearch", params) ?: return emptyList()
         return listNodes(data).mapNotNull { mapper.mapPddGoods(it) }
     }
+
+    private fun attachVeapiPddParams(params: MutableMap<String, String>, ctx: AffiliateContext) {
+        val pid = veapi.pdd.pid.takeIf { it.isNotBlank() }
+            ?: props.pdd.pid.takeIf { it.isNotBlank() }
+        if (pid == null) {
+            log.warn("[veapi] 拼多多未配置 pid，接口可能返回空（请在 zdsj.affiliate.veapi.pdd.pid 填写已备案推广位）")
+            return
+        }
+        params["pid"] = pid
+        params["p_id"] = pid
+        val custom = ctx.userKey?.takeIf { it.isNotBlank() }
+            ?: veapi.pdd.defaultCustomParameters.takeIf { it.isNotBlank() }
+        if (custom != null) params["custom_parameters"] = custom
+        if (ctx.authMode == AuthMode.PUBLIC) {
+            veapi.pdd.sessionkey.takeIf { it.isNotBlank() }?.let { params["sessionkey"] = it }
+        }
+    }
+
+    private fun pddAuthMode(): AuthMode =
+        if (veapi.pdd.authMode.equals("public", ignoreCase = true)) AuthMode.PUBLIC else AuthMode.SELF
 
     private fun buildPddLink(ctx: AffiliateContext, itemId: String): String? {
         val params = mutableMapOf("goods_sign_list" to itemId)
         if (itemId.all { it.isDigit() }) params["usenumid"] = "1"
-        val pid = veapi.pdd.pid.takeIf { it.isNotBlank() }
-        if (pid != null) params["p_id"] = pid
-        if (ctx.authMode == AuthMode.PUBLIC) {
-            veapi.pdd.sessionkey.takeIf { it.isNotBlank() }?.let { params["sessionkey"] = it }
-        }
+        attachVeapiPddParams(params, ctx)
         val data = client.get("/pdd/pdd_promlink", params) ?: return null
         val first = listNodes(data.path("goods_promotion_url_list").takeIf { !it.isMissingNode } ?: data)
             .firstOrNull() ?: return null

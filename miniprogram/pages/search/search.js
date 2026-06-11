@@ -2,6 +2,7 @@ const api = require('../../api/index');
 const track = require('../../utils/track');
 const { detectFromClipboard } = require('../../utils/clipboard');
 const { resolveImageUrl } = require('../../utils/format');
+const { prepareImageForDisplay, prepareListImages } = require('../../utils/image');
 
 const app = getApp();
 
@@ -32,19 +33,17 @@ Page({
     if (normalized.length && JSON.stringify(normalized) !== JSON.stringify(raw)) {
       wx.setStorageSync('recentQueries', normalized);
     }
-    this.setData({
-      recent: normalized.map((r) => ({
-        ...r,
-        imageUrl: resolveImageUrl(r.imageUrl),
-        _imgErr: false,
-      })),
-    });
+    prepareListImages(
+      normalized.map((r) => ({ ...r, _imgErr: false })),
+    ).then((recent) => this.setData({ recent }));
   },
 
   _toRelativeImage(url) {
     if (!url) return '';
-    const idx = url.indexOf('/api/product/image');
-    if (idx >= 0) return url.slice(idx);
+    const apiIdx = url.indexOf('/api/product/image');
+    if (apiIdx >= 0) return url.slice(apiIdx);
+    const staticIdx = url.indexOf('/static/products/');
+    if (staticIdx >= 0) return url.slice(staticIdx);
     if (/^https?:\/\//i.test(url)) {
       return url.replace(/^https?:\/\/[^/]+/i, '');
     }
@@ -127,7 +126,8 @@ Page({
     track.event('search_submit');
     api
       .search(keyword)
-      .then((list) => this.setData({ searchResults: list }))
+      .then((list) => prepareListImages(list || []))
+      .then((searchResults) => this.setData({ searchResults }))
       .catch((err) => wx.showToast({ title: err.message || '搜索失败', icon: 'none' }));
   },
 
@@ -162,12 +162,8 @@ Page({
     });
     const next = stored.slice(0, 10);
     wx.setStorageSync('recentQueries', next);
-    this.setData({
-      recent: next.map((r) => ({
-        ...r,
-        imageUrl: resolveImageUrl(r.imageUrl),
-        _imgErr: false,
-      })),
-    });
+    prepareListImages(next.map((r) => ({ ...r, _imgErr: false }))).then((recent) =>
+      this.setData({ recent }),
+    );
   },
 });

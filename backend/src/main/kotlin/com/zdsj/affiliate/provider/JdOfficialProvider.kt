@@ -34,7 +34,7 @@ class JdOfficialProvider(
         return runCatching { jdUnionService.fetchBySkuId(itemId) }.getOrNull()
     }
 
-    override fun fetchFromShareText(linkText: String): AffiliateItem? {
+    override fun fetchFromShareText(linkText: String, ctx: AffiliateContext?): AffiliateItem? {
         if (JdLinkParser.extractItemId(linkText) == null) return null
         guardRate()
         return runCatching { jdUnionService.fetchFromShareText(linkText) }.getOrNull()

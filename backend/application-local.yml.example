@@ -14,7 +14,7 @@ zdsj:
         fallback: jd_official,mock
       pdd:
         primary: veapi
-        fallback: mock
+        fallback: pdd_official,mock
     veapi:
       vekey: YOUR_VEAPI_VEKEY
       secret: YOUR_VEAPI_SECRET   # 可选，与会员中心一致时填写
@@ -26,7 +26,9 @@ zdsj:
         chain-type: 1                     # 1=长链 clickURL，2=短链 u.jd.com
       pdd:
         auth-mode: self
-        pid: YOUR_PDD_PID
+        pid: YOUR_PDD_PID                    # 必填：维易/拼多多已备案的推广位，形如 123456_789012345
+        # 若备案时绑定了 custom_parameters，游客解析需填默认值；仅 pid 备案可留空
+        # default-custom-parameters: '{"uid":"guest"}'
     jd:
       app-key: YOUR_JD_APP_KEY
       app-secret: YOUR_JD_APP_SECRET

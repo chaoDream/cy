@@ -73,6 +73,7 @@ zdsj:
         auth-mode: ${VEAPI_PDD_AUTH_MODE:self}
         sessionkey: ${VEAPI_PDD_SESSIONKEY:}
         pid: ${VEAPI_PDD_PID:}
+        default-custom-parameters: ${VEAPI_PDD_DEFAULT_CP:}
     # 熔断：连续失败达阈值则冷却期内跳过该 provider
     breaker:
       fail-threshold: ${AFFILIATE_BREAKER_THRESHOLD:3}

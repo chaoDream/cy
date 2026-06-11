@@ -30,7 +30,7 @@ class MockProvider : AffiliateProvider {
         return MockCatalog.toItem(ctx.platform, itemId, MockCatalog.genericSeed(itemId))
     }
 
-    override fun fetchFromShareText(linkText: String): AffiliateItem? {
+    override fun fetchFromShareText(linkText: String, ctx: AffiliateContext?): AffiliateItem? {
         val (platform, id) = detect(linkText) ?: return null
         val shareTitle = JdLinkParser.extractShareTitle(linkText) ?: PddLinkParser.extractShareTitle(linkText)
         val seed = shareTitle?.let { MockCatalog.matchByKeyword(it) }

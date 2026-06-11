@@ -16,6 +16,7 @@
       <view class="prod-meta">
         <text class="tag">{{platformText}}</text>
         <text class="tag" wx:if="{{shopTypeText}}">{{shopTypeText}}</text>
+        <text class="tag {{item.gov ? 'tag-gov' : ''}}" wx:for="{{productTags}}" wx:key="text">{{item.text}}</text>
       </view>
       <text class="prod-shop muted">{{data.productInfo.shopName}}</text>
       <view class="sku-conf">

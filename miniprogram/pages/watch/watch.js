@@ -2,6 +2,7 @@ const api = require('../../api/index');
 const track = require('../../utils/track');
 const { ensureLogin } = require('../../utils/auth');
 const { yuanTrim } = require('../../utils/format');
+const { prepareListImages } = require('../../utils/image');
 
 Page({
   data: {
@@ -30,11 +31,13 @@ Page({
           currentPriceText: yuanTrim(it.currentPrice),
           targetPriceText: yuanTrim(it.targetPrice),
         }));
-        this.setData({
-          list: items,
-          notifyAll: items.length > 0 && items.some((it) => it.notifyEnabled),
-          loading: false,
-          loadError: '',
+        return prepareListImages(items).then((prepared) => {
+          this.setData({
+            list: prepared,
+            notifyAll: prepared.length > 0 && prepared.some((it) => it.notifyEnabled),
+            loading: false,
+            loadError: '',
+          });
         });
       })
       .catch((err) => {

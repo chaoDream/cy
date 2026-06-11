@@ -83,8 +83,13 @@ data class AffiliateProperties(
     data class VeapiPdd(
         val authMode: String = "self",
         val sessionkey: String = "",
-        /** CPS 归因：你自己的推广位 PID */
+        /** CPS 归因：多多进宝推广位 PID（维易 pdd_goodssearch 必填，须已在维易/拼多多备案） */
         val pid: String = "",
+        /**
+         * 游客解析链接时的 custom_parameters（JSON 或纯 uid 字符串）。
+         * 若备案时只绑了 pid、未绑 custom_parameters，可留空。
+         */
+        val defaultCustomParameters: String = "",
     )
 
     data class Breaker(

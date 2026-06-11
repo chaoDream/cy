@@ -69,14 +69,14 @@ class AnalysisService(
     private val log = LoggerFactory.getLogger(javaClass)
 
     /** POST /api/link/parse —— 解析链接/淘口令/分享文本 */
-    fun parseLink(linkText: String): ParseResult {
+    fun parseLink(linkText: String, userKey: String? = null): ParseResult {
         if (linkText.isBlank()) {
             throw BizException(ErrorCode.LINK_EMPTY, "请粘贴京东或拼多多手机商品链接")
         }
         val detected = gateway.detect(linkText)
             ?: throw BizException(ErrorCode.PLATFORM_UNSUPPORTED, "当前版本优先支持京东和拼多多")
         val (platform, _) = detected
-        val item = gateway.fetchFromShareText(linkText).data
+        val item = gateway.fetchFromShareText(linkText, userKey).data
             ?: throw BizException(ErrorCode.PARSE_FAILED, "暂时没识别出来，可以换一个链接试试")
         val enriched = enrichShareMeta(item, linkText)
         val priced = ensureJdPricedItem(enriched, linkText)

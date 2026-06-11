@@ -34,7 +34,7 @@ class PddOfficialProvider(
         return runCatching { pddDdkService.fetchItem(itemId) }.getOrNull()
     }
 
-    override fun fetchFromShareText(linkText: String): AffiliateItem? {
+    override fun fetchFromShareText(linkText: String, ctx: AffiliateContext?): AffiliateItem? {
         if (!PddLinkParser.isPddShareText(linkText)) return null
         guardRate()
         return runCatching { pddDdkService.fetchFromShareText(linkText) }.getOrNull()
