@@ -90,7 +90,9 @@ class SeedPricePollingJob(
         val raw = ingestService.upsert(item)
         val (sku, _) = skuService.resolveAndPersist(raw.id!!, item)
         val priceResult = priceEngine.compute(item, UserAssets())
-        priceService.recordSnapshot(raw.id!!, sku?.id, item.platform, priceResult)
+        if (!priceResult.pricePending) {
+            priceService.recordSnapshot(raw.id!!, sku?.id, item.platform, priceResult)
+        }
         return priceResult
     }
 }

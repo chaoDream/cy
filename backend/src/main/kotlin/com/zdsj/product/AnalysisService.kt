@@ -39,6 +39,7 @@ data class AnalysisCoreResult(
     val trendInfo: PriceTrend,
     val riskInfo: List<String>,
     val crossPlatform: List<Map<String, Any?>>,
+    val shopAlternative: Map<String, Any?>?,
     val cpsLink: String?,
 )
 
@@ -101,9 +102,10 @@ class AnalysisService(
     /** GET /api/product/analysis —— 核心数据（价格/趋势/风险/跨平台），不含 AI */
     fun analyze(platformCode: String, itemId: String, assets: UserAssets, userKey: String? = null): AnalysisCoreResult {
         val ctx = prepareAnalysis(platformCode, itemId, assets)
+        val alt = samePlatformUpgrade(ctx.platform, ctx.sku, ctx.item, assets, userKey)
         val cross = crossPlatform(ctx.platform, ctx.sku, ctx.item, assets, userKey)
         val purchase = resolvePurchaseLink(ctx.platform, ctx.item, userKey)
-        return toCoreResult(ctx, cross, purchase)
+        return toCoreResult(ctx, cross, alt, purchase)
     }
 
     /** GET /api/product/ai-recommendation —— AI 购买建议（独立加载，不阻塞首屏） */
@@ -130,7 +132,9 @@ class AnalysisService(
         val raw = ingestService.upsert(item)
         val (sku, mapping) = skuService.resolveAndPersist(raw.id!!, item)
         val priceResult = priceEngine.compute(item, assets)
-        priceService.recordSnapshot(raw.id!!, sku?.id, platform.code, priceResult)
+        if (!priceResult.pricePending) {
+            priceService.recordSnapshot(raw.id!!, sku?.id, platform.code, priceResult)
+        }
         val trend = priceService.trend(sku?.id, priceResult.estimatedFinalPrice)
         val riskTags = mapping.riskTags.toMutableList()
         if (item.shopType == "thirdparty" && riskTags.none { it.contains("第三方") }) {
@@ -156,6 +160,7 @@ class AnalysisService(
     private fun toCoreResult(
         ctx: PreparedAnalysis,
         cross: List<Map<String, Any?>>,
+        alt: Map<String, Any?>?,
         purchase: Pair<String?, String>,
     ) = AnalysisCoreResult(
         productInfo = productInfoMap(ctx.raw, ctx.item) + mapOf(
@@ -171,6 +176,7 @@ class AnalysisService(
         trendInfo = ctx.trend,
         riskInfo = ctx.riskTags,
         crossPlatform = cross,
+        shopAlternative = alt,
         cpsLink = purchase.first,
     )
 
@@ -231,6 +237,44 @@ class AnalysisService(
                 "rawPrice" to item.rawPrice,
             )
         }
+    }
+
+    private val TRUSTED_SHOP_TYPES = setOf("self", "flagship")
+
+    /**
+     * 同平台店铺类型切换：搜索同款的另一种店铺类型版本。
+     * 当前是第三方 → 找自营/旗舰；当前是自营/旗舰 → 找第三方。
+     */
+    private fun samePlatformUpgrade(
+        platform: Platform,
+        sku: com.zdsj.product.ProductSku?,
+        selfItem: AffiliateItem,
+        assets: UserAssets,
+        userKey: String? = null,
+    ): Map<String, Any?>? {
+        val keyword = sku?.let { "${it.brand} ${it.model}" }
+            ?: com.zdsj.affiliate.KeywordDegrader.degrade(selfItem.title)
+            ?: return null
+        val recallTitle = (selfItem.couponInfo["_shareTitle"] as? String)?.takeIf { it.isNotBlank() }
+            ?: selfItem.title
+        val isTrusted = selfItem.shopType in TRUSTED_SHOP_TYPES
+        val hits = gateway.search(platform, keyword, 10).data ?: return null
+        val candidates = hits.filter {
+            it.platformItemId != selfItem.platformItemId &&
+                if (isTrusted) it.shopType !in TRUSTED_SHOP_TYPES else it.shopType in TRUSTED_SHOP_TYPES
+        }
+        val candidate = com.zdsj.affiliate.JdGoodsMatcher.pickBest(recallTitle, candidates)
+            ?: candidates.firstOrNull { com.zdsj.affiliate.JdGoodsMatcher.matchesShareTitle(recallTitle, it) }
+            ?: return null
+        val price = priceEngine.compute(candidate, assets)
+        return mapOf(
+            "platform" to platform.code,
+            "itemId" to candidate.platformItemId,
+            "title" to candidate.title,
+            "shopName" to candidate.shopName,
+            "shopType" to candidate.shopType,
+            "estimatedFinalPrice" to price.estimatedFinalPrice,
+        )
     }
 
     private fun crossPlatform(
@@ -442,7 +486,7 @@ class AnalysisService(
         "imageUrl" to imageStorage.displayUrl(raw),
         "shopName" to item.shopName,
         "shopType" to item.shopType,
-        "rawPrice" to item.rawPrice,
+        "rawPrice" to item.rawPrice.takeIf { it > BigDecimal.ZERO },
         "activityTags" to item.activityTags,
         "sourceUrl" to item.sourceUrl,
     )

@@ -83,6 +83,7 @@ Page({
     aiRecommendation: null,
     aiError: '',
     watchModal: { show: false },
+    shopAlt: null,
     // 国补定位弹窗
     locModal: { show: false },
     regionPicker: { show: false },
@@ -121,18 +122,26 @@ Page({
           price: yuan(c.estimatedFinalPrice),
         }));
         const sameItemBuyable = !!res.cpsLink;
-        const finalPrice = yuan(res.priceInfo && res.priceInfo.estimatedFinalPrice);
-        const displayPrice = yuan(res.priceInfo && res.priceInfo.displayPrice);
-        const pricePending = finalPrice === '--' || Number(finalPrice) <= 0;
-        if (res.priceInfo) {
-          res.priceInfo.finalPriceText = finalPrice;
-          res.priceInfo.displayPriceText = displayPrice;
-          res.priceInfo.pricePending = pricePending;
+        if (res.priceInfo && !res.priceInfo.pricePending) {
+          res.priceInfo.finalPriceText = yuan(res.priceInfo.estimatedFinalPrice);
+          res.priceInfo.displayPriceText = yuan(res.priceInfo.displayPrice);
+        } else if (res.priceInfo) {
+          res.priceInfo.finalPriceText = null;
+          res.priceInfo.displayPriceText = null;
         }
         const productTags = (res.productInfo.activityTags || []).map((t) => ({
           text: t,
           gov: /国补/.test(t),
         }));
+        const alt = res.shopAlternative;
+        const shopAlt = alt ? {
+          itemId: alt.itemId,
+          platform: alt.platform,
+          shopType: alt.shopType,
+          shopTypeText: shopTypeName(alt.shopType),
+          shopName: alt.shopName,
+          price: yuan(alt.estimatedFinalPrice),
+        } : null;
         this.setData({
           loading: false,
           data: res,
@@ -141,6 +150,7 @@ Page({
           productTags,
           crossView,
           sameItemBuyable,
+          shopAlt,
         });
         track.event('analysis_view', {
           platform: this.data.platform,
@@ -365,6 +375,14 @@ Page({
 
   _copyAndGuide(link, linkType, platform) {
     copyPurchaseLink(link, linkType, platform);
+  },
+
+  onSwitchShop() {
+    const alt = this.data.shopAlt;
+    if (!alt) return;
+    wx.redirectTo({
+      url: `/packageA/pages/analysis/analysis?platform=${alt.platform}&itemId=${alt.itemId}`,
+    });
   },
 
   // ---- 国补定位弹窗 ----

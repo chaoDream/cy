@@ -1,4 +1,4 @@
-const PROVINCES = ['', '北京市', '上海市', '广东省', '江苏省', '浙江省', '四川省', '湖北省', '山东省', '河南省'];
+const PROVINCES = ['不要国补优惠', '北京市', '上海市', '广东省', '江苏省', '浙江省', '四川省', '湖北省', '山东省', '河南省'];
 
 Component({
   properties: {
@@ -15,7 +15,8 @@ Component({
 
   observers: {
     assets(val) {
-      const idx = PROVINCES.indexOf(val.govSubsidyRegion || '');
+      const region = val.govSubsidyRegion || '';
+      const idx = region ? PROVINCES.indexOf(region) : 0;
       this.setData({ regionIndex: idx >= 0 ? idx : 0 });
     },
   },
@@ -30,7 +31,8 @@ Component({
 
     onRegionChange(e) {
       const idx = Number(e.detail.value);
-      const next = Object.assign({}, this.data.assets, { govSubsidyRegion: PROVINCES[idx] });
+      const region = idx === 0 ? '' : PROVINCES[idx];
+      const next = Object.assign({}, this.data.assets, { govSubsidyRegion: region });
       this.setData({ regionIndex: idx });
       this._emit(next);
     },

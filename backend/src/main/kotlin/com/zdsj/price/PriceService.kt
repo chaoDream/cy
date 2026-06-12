@@ -32,8 +32,8 @@ class PriceService(private val snapshotRepo: PriceSnapshotRepository) {
             rawProductId = rawProductId,
             skuId = skuId,
             platform = platform,
-            displayPrice = result.displayPrice,
-            estimatedFinalPrice = result.estimatedFinalPrice,
+            displayPrice = result.displayPrice ?: BigDecimal.ZERO,
+            estimatedFinalPrice = result.estimatedFinalPrice ?: BigDecimal.ZERO,
             couponAmount = result.couponAmount,
             subsidyAmount = result.subsidyAmount,
             freight = result.freight,
@@ -57,8 +57,8 @@ class PriceService(private val snapshotRepo: PriceSnapshotRepository) {
         snapshotRepo.findMinFinalPriceBySkuSince(skuId, OffsetDateTime.now().minusDays(90))
 
     /** 30/90 天趋势 + 反套路（先涨后降）识别（PRD §5.6） */
-    fun trend(skuId: Long?, currentPrice: BigDecimal): PriceTrend {
-        if (skuId == null) {
+    fun trend(skuId: Long?, currentPrice: BigDecimal?): PriceTrend {
+        if (skuId == null || currentPrice == null) {
             return PriceTrend(emptyList(), null, null, false, false, true, "历史价格积累中")
         }
         val since = OffsetDateTime.now().minusDays(90)

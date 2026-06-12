@@ -101,7 +101,7 @@ class WatchService(
         if (original <= BigDecimal.ZERO) return original
         val assets = UserAssets.from(userService.getProfile(userId).assetsJson)
         val price = priceEngine.compute(ingestService.toAffiliateItem(raw), assets).estimatedFinalPrice
-        return if (price > BigDecimal.ZERO) price else original
+        return if (price != null && price > BigDecimal.ZERO) price else original
     }
 
     private fun defaultTarget(skuId: Long?, currentPrice: BigDecimal): BigDecimal {

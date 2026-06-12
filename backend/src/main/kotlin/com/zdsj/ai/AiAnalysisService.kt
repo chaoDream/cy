@@ -18,7 +18,7 @@ data class AiInput(
     val standardSku: String?,
     val platform: String,
     val shopType: String?,
-    val currentFinalPrice: BigDecimal,
+    val currentFinalPrice: BigDecimal?,
     val low30: BigDecimal?,
     val low90: BigDecimal?,
     val nearLow: Boolean,
@@ -130,7 +130,7 @@ class AiAnalysisService(
                 conclusion = Conclusion.BUY
                 reasons += "当前参考到手价已接近近 30 天低价，价格处于较优区间"
             }
-            input.low30 != null && input.currentFinalPrice > input.low30 -> {
+            input.low30 != null && input.currentFinalPrice != null && input.currentFinalPrice > input.low30 -> {
                 val diff = input.currentFinalPrice - input.low30
                 conclusion = if (diff > BigDecimal("200")) Conclusion.WAIT else Conclusion.CAUTION
                 reasons += "当前参考到手价比近 30 天低价高 ${diff.toPlainString()} 元"

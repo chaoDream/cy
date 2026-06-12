@@ -69,6 +69,19 @@
   font-weight: 600;
 }
 .prod-shop { display: block; }
+.prod-shop-row { display: flex; align-items: center; justify-content: space-between; }
+.shop-switch {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  padding: 4rpx 14rpx;
+  background: #f0f9f4;
+  border-radius: 8rpx;
+  flex-shrink: 0;
+}
+.shop-switch-text { font-size: 20rpx; color: #34c759; }
+.shop-switch-price { font-size: 20rpx; color: #fa3534; font-weight: 600; }
+.shop-switch-arrow { font-size: 24rpx; color: #34c759; }
 .sku-conf { font-size: 22rpx; color: #6b7280; margin-top: 10rpx; }
 .conf { margin-left: 10rpx; padding: 2rpx 10rpx; border-radius: 6rpx; font-size: 20rpx; }
 .conf-high { background: #e8f8ee; color: #34c759; }

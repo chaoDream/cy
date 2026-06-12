@@ -34,8 +34,9 @@ data class DiscountItem(val name: String, val amount: BigDecimal, val included: 
  * estimatedFinalPrice 由纯规则计算，绝不经过 AI。
  */
 data class FinalPriceResult(
-    val displayPrice: BigDecimal,
-    val estimatedFinalPrice: BigDecimal,
+    val pricePending: Boolean,
+    val displayPrice: BigDecimal?,
+    val estimatedFinalPrice: BigDecimal?,
     val couponAmount: BigDecimal,
     val subsidyAmount: BigDecimal,
     val freight: BigDecimal,
@@ -67,13 +68,27 @@ class PriceEngine(
 
     fun compute(item: AffiliateItem, assets: UserAssets): FinalPriceResult {
         val display = item.rawPrice
+        if (display <= BigDecimal.ZERO) {
+            return FinalPriceResult(
+                pricePending = true,
+                displayPrice = null,
+                estimatedFinalPrice = null,
+                couponAmount = BigDecimal.ZERO,
+                subsidyAmount = BigDecimal.ZERO,
+                freight = BigDecimal.ZERO,
+                included = emptyList(),
+                notIncluded = emptyList(),
+                uncertaintyFlags = emptyList(),
+                disclaimer = "联盟暂未返回价格，请重新粘贴链接或稍后重试",
+            )
+        }
+
         val included = mutableListOf<DiscountItem>()
 
         val platformCoupon = bd(item.couponInfo["platformCoupon"])
         val shopCoupon = bd(item.couponInfo["shopCoupon"])
         val crossShop = bd(item.couponInfo["crossShop"])
         val subsidy = item.subsidyAmount
-        // 活动优惠（京东价格瀑布 price−lowestPrice，秒杀/拼购/会员/大促），名称随促销类型
         val promoDiscount = bd(item.couponInfo["promoDiscount"])
         val promoType = (item.couponInfo["priceTagType"] as? Number)?.toInt() ?: 0
 
@@ -83,12 +98,10 @@ class PriceEngine(
         if (crossShop > BigDecimal.ZERO) included += DiscountItem("跨店满减", crossShop, true)
         if (subsidy > BigDecimal.ZERO) included += DiscountItem("平台/官方补贴", subsidy, true)
 
-        // 资产库专属优惠（自申报，PRD §5.1）
         val memberDiscount = memberDiscount(item, assets, display)
         if (memberDiscount.amount > BigDecimal.ZERO) included += memberDiscount
 
         val totalCoupon = platformCoupon + shopCoupon + crossShop
-        // 国补基数 = 扣除券/活动/平台补贴/会员价后的净价（符合「按最终售价×比例」政策口径，国补置于瀑布末环）
         val govBase = (display - totalCoupon - promoDiscount - subsidy - memberDiscount.amount)
             .max(BigDecimal.ZERO)
         val govSubsidy = govSubsidy(item, assets, govBase)
@@ -100,13 +113,11 @@ class PriceEngine(
             .max(BigDecimal.ZERO)
             .setScale(2, RoundingMode.HALF_UP)
 
-        // 暂不精确纳入（PRD §5.3）
         val notIncluded = listOf(
             "个人随机红包", "支付渠道优惠", "直播间专属价", "新客专享价", "以旧换新（可能更低）",
         )
 
         val uncertaintyFlags = buildList {
-            // lowestPriceType==3 的专享价通常需 PLUS 会员，非会员提示（不改变计算口径）
             if (promoDiscount > BigDecimal.ZERO && promoType == 3 && !assets.jdPlus) {
                 add("专享价通常需 PLUS 会员，非会员到手价可能略高")
             }
@@ -116,6 +127,7 @@ class PriceEngine(
         }
 
         return FinalPriceResult(
+            pricePending = false,
             displayPrice = display,
             estimatedFinalPrice = finalPrice,
             couponAmount = totalCoupon,

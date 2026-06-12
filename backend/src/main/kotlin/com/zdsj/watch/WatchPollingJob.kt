@@ -106,9 +106,9 @@ class WatchPollingJob(
             return null
         }
         val priceResult = priceEngine.compute(item, assets)
-        if (priceResult.estimatedFinalPrice <= BigDecimal.ZERO) return null
+        if (priceResult.pricePending) return null
         priceService.recordSnapshot(raw.id!!, w.skuId, platform.code, priceResult)
-        return Quote(priceResult.estimatedFinalPrice, raw.platformItemId)
+        return Quote(priceResult.estimatedFinalPrice!!, raw.platformItemId)
     }
 
     /** 盯该平台同款所有商家：按 SKU 搜索，匹配过滤后取估算到手价最低的一条 */
@@ -121,10 +121,10 @@ class WatchPollingJob(
         val best = hits
             .filter { it.rawPrice > BigDecimal.ZERO && JdGoodsMatcher.matchesShareTitle(raw.title, it) }
             .map { it to priceEngine.compute(it, assets) }
-            .filter { it.second.estimatedFinalPrice > BigDecimal.ZERO }
-            .minByOrNull { it.second.estimatedFinalPrice }
+            .filter { !it.second.pricePending }
+            .minByOrNull { it.second.estimatedFinalPrice!! }
             ?: return null
         priceService.recordSnapshot(raw.id!!, w.skuId, platform.code, best.second)
-        return Quote(best.second.estimatedFinalPrice, best.first.platformItemId)
+        return Quote(best.second.estimatedFinalPrice!!, best.first.platformItemId)
     }
 }

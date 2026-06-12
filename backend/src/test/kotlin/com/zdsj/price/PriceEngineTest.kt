@@ -63,7 +63,7 @@ class PriceEngineTest {
         val withMemberPrice = item("jd", 8999, 200, 100, memberPrice = 8800, memberType = "jdPlus")
         val base = engine.compute(withMemberPrice, UserAssets())
         val withPlus = engine.compute(withMemberPrice, UserAssets(jdPlus = true))
-        assertTrue(withPlus.estimatedFinalPrice < base.estimatedFinalPrice)
+        assertTrue(withPlus.estimatedFinalPrice!! < base.estimatedFinalPrice!!)
         val plus = withPlus.included.firstOrNull { it.name.contains("PLUS") }
         assertTrue(plus != null && plus.amount == BigDecimal("199.00"))
     }
