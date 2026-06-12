@@ -125,19 +125,101 @@ zdsj:
   subsidy:
     # 政府国补规则表（无实时 API，按地区维护；以当地政策与名额为准）
     # region 需与用户资产库 govSubsidyRegion 精确匹配；rate=比例，cap=封顶(元)，min-price=享补门槛(元)
-    enabled: ${GOV_SUBSIDY_ENABLED:false}
+    enabled: ${GOV_SUBSIDY_ENABLED:true}
     regions:
+      - region: "北京市"
+        rate: 0.15
+        cap: 2000
       - region: "上海市"
         rate: 0.15
         cap: 2000
-        min-price: 0
+      - region: "天津市"
+        rate: 0.15
+        cap: 2000
+      - region: "重庆市"
+        rate: 0.15
+        cap: 2000
+      - region: "广东省"
+        rate: 0.15
+        cap: 2000
       - region: "江苏省"
         rate: 0.15
-        cap: 1500
-      - region: "广东省"
-        rate: 0.10
-        cap: 1000
-        enabled: false              # 示例：单条停用
+        cap: 2000
+      - region: "浙江省"
+        rate: 0.15
+        cap: 2000
+      - region: "四川省"
+        rate: 0.15
+        cap: 2000
+      - region: "湖北省"
+        rate: 0.15
+        cap: 2000
+      - region: "山东省"
+        rate: 0.15
+        cap: 2000
+      - region: "河南省"
+        rate: 0.15
+        cap: 2000
+      - region: "福建省"
+        rate: 0.15
+        cap: 2000
+      - region: "湖南省"
+        rate: 0.15
+        cap: 2000
+      - region: "安徽省"
+        rate: 0.15
+        cap: 2000
+      - region: "河北省"
+        rate: 0.15
+        cap: 2000
+      - region: "陕西省"
+        rate: 0.15
+        cap: 2000
+      - region: "辽宁省"
+        rate: 0.15
+        cap: 2000
+      - region: "江西省"
+        rate: 0.15
+        cap: 2000
+      - region: "广西壮族自治区"
+        rate: 0.15
+        cap: 2000
+      - region: "云南省"
+        rate: 0.15
+        cap: 2000
+      - region: "贵州省"
+        rate: 0.15
+        cap: 2000
+      - region: "山西省"
+        rate: 0.15
+        cap: 2000
+      - region: "吉林省"
+        rate: 0.15
+        cap: 2000
+      - region: "黑龙江省"
+        rate: 0.15
+        cap: 2000
+      - region: "甘肃省"
+        rate: 0.15
+        cap: 2000
+      - region: "内蒙古自治区"
+        rate: 0.15
+        cap: 2000
+      - region: "新疆维吾尔自治区"
+        rate: 0.15
+        cap: 2000
+      - region: "海南省"
+        rate: 0.15
+        cap: 2000
+      - region: "宁夏回族自治区"
+        rate: 0.15
+        cap: 2000
+      - region: "青海省"
+        rate: 0.15
+        cap: 2000
+      - region: "西藏自治区"
+        rate: 0.15
+        cap: 2000
   avatar:
     storage-dir: ${AVATAR_STORAGE_DIR:./data/avatars}
     public-path-prefix: /static/avatars

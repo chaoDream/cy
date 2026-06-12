@@ -19,10 +19,7 @@ import java.math.RoundingMode
 class VeapiMapper {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    private companion object {
-        /** 国补促销类型：9105 以旧换新、9107 购新立减、9100 支付立减 */
-        val GOV_SUBSIDY_SUBTYPES = setOf(9100, 9105, 9107)
-    }
+    private companion object
 
     /** 京东推广商品主体信息（/jd/promotiongoodsinfo）节点 */
     fun mapJdPromotionGoods(node: JsonNode): AffiliateItem? {
@@ -75,7 +72,7 @@ class VeapiMapper {
             coupons = coupons,
         )
         // 国补促销标签（purchasePriceInfo.promotionLabelInfoList）+ 京东预算到手价
-        val govSubsidy = parseGovSubsidy(node)
+        val govSubsidy = com.zdsj.affiliate.GovSubsidyParser.parse(node)
         val purchasePrice = node.path("purchasePriceInfo").path("purchasePrice").positiveDecimalOrNull()
         val shopType = if (node.path("owner").asText("") == "g") "self" else "thirdparty"
         return build(
@@ -100,7 +97,7 @@ class VeapiMapper {
                 if (shopType == "self") add("京东自营")
                 if (pricing.priceTag.isNotBlank()) add(pricing.priceTag)
                 if (pricing.couponDeduction > BigDecimal.ZERO) add("券${pricing.couponDeduction.plain()}元")
-                govSubsidy?.let { add(govSubsidyTag(it["govSubsidyType"] as? Int)) }
+                govSubsidy?.let { add(com.zdsj.affiliate.GovSubsidyParser.tag(it["govSubsidyType"] as? Int)) }
             },
             context = "jd_search",
         )
@@ -174,46 +171,6 @@ class VeapiMapper {
             activityTags = tags.ifEmpty { listOf("维易") },
             sourceUrl = sourceUrl,
         )
-    }
-
-    /**
-     * 解析国补：取 purchasePriceInfo.promotionLabelInfoList 中 subType 命中国补类型的标签。
-     * 国补按地区生效（provinceNameList），具体金额由 PriceEngine 结合用户省份计算。
-     */
-    private fun parseGovSubsidy(node: JsonNode): Map<String, Any?>? {
-        val labels = node.path("purchasePriceInfo").path("promotionLabelInfoList").promotionLabels()
-        val gov = labels.firstOrNull { it.path("subType").asInt(0) in GOV_SUBSIDY_SUBTYPES } ?: return null
-        val rate = gov.path("rebate").positiveDecimalOrNull() ?: return null
-        val provinces = gov.path("provinceNameList").asProvinceList()
-        if (provinces.isEmpty()) return null
-        return buildMap {
-            put("govSubsidyRate", rate)
-            put("govSubsidyCap", gov.path("topDiscount").positiveDecimalOrNull() ?: BigDecimal.ZERO)
-            put("govSubsidyProvinces", provinces)
-            put("govSubsidyType", gov.path("subType").asInt(0))
-        }
-    }
-
-    private fun govSubsidyTag(subType: Int?): String = when (subType) {
-        9105 -> "以旧换新国补"
-        9107 -> "国补购新立减"
-        9100 -> "国补支付立减"
-        else -> "国补"
-    }
-
-    /** promotionLabelInfoList 兼容数组 / {promotionLabelInfo:…} / 单对象三种形态 */
-    private fun JsonNode.promotionLabels(): List<JsonNode> = when {
-        isMissingNode || isNull -> emptyList()
-        isArray -> toList()
-        isObject -> {
-            val inner = path("promotionLabelInfo")
-            when {
-                inner.isArray -> inner.toList()
-                inner.isObject -> listOf(inner)
-                else -> listOf(this)
-            }
-        }
-        else -> emptyList()
     }
 
     /** provinceNameList 兼容真数组与字符串 "[天津,北京]" 两种返回 */

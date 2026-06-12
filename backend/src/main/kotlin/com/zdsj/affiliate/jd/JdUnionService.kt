@@ -192,12 +192,14 @@ class JdUnionService(
             "g" -> "self"
             else -> "thirdparty"
         }
+        val govSubsidy = com.zdsj.affiliate.GovSubsidyParser.parse(node)
         val tags = buildList {
             if (shopType == "self") add("京东自营")
             if (pricing.priceTag.isNotBlank()) add(pricing.priceTag)
             if (pricing.couponDeduction > BigDecimal.ZERO) {
                 add("券${pricing.couponDeduction.stripTrailingZeros().toPlainString()}元")
             }
+            govSubsidy?.let { add(com.zdsj.affiliate.GovSubsidyParser.tag(it["govSubsidyType"] as? Int)) }
             node.path("skuTagList").forEach { add(it.asText()) }
         }
 
@@ -209,13 +211,14 @@ class JdUnionService(
             shopName = node.path("shopInfo").path("shopName").asText(null),
             shopType = shopType,
             rawPrice = pricing.displayPrice,
-            couponInfo = mapOf(
-                "platformCoupon" to pricing.singleCoupon,
-                "shopCoupon" to pricing.shopCoupon,
-                "promoDiscount" to pricing.promoDiscount,
-                "priceTag" to pricing.priceTag,
-                "priceTagType" to pricing.priceTagType,
-            ),
+            couponInfo = buildMap {
+                put("platformCoupon", pricing.singleCoupon)
+                put("shopCoupon", pricing.shopCoupon)
+                put("promoDiscount", pricing.promoDiscount)
+                put("priceTag", pricing.priceTag)
+                put("priceTagType", pricing.priceTagType)
+                govSubsidy?.let { putAll(it) }
+            },
             // 活动/券已在 couponInfo 拆项，不再用 price−lowestCouponPrice 反推（会重复扣减）
             subsidyAmount = BigDecimal.ZERO,
             freight = BigDecimal.ZERO,

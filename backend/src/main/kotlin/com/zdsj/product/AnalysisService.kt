@@ -253,28 +253,36 @@ class AnalysisService(
         userKey: String? = null,
     ): Map<String, Any?>? {
         val keyword = sku?.let { "${it.brand} ${it.model}" }
-            ?: com.zdsj.affiliate.KeywordDegrader.degrade(selfItem.title)
+            ?: extractBrandModel(selfItem.title)
             ?: return null
-        val recallTitle = (selfItem.couponInfo["_shareTitle"] as? String)?.takeIf { it.isNotBlank() }
-            ?: selfItem.title
         val isTrusted = selfItem.shopType in TRUSTED_SHOP_TYPES
         val hits = gateway.search(platform, keyword, 10).data ?: return null
         val candidates = hits.filter {
             it.platformItemId != selfItem.platformItemId &&
                 if (isTrusted) it.shopType !in TRUSTED_SHOP_TYPES else it.shopType in TRUSTED_SHOP_TYPES
         }
-        val candidate = com.zdsj.affiliate.JdGoodsMatcher.pickBest(recallTitle, candidates)
-            ?: candidates.firstOrNull { com.zdsj.affiliate.JdGoodsMatcher.matchesShareTitle(recallTitle, it) }
+        if (candidates.isEmpty()) return null
+        // 用精简的品牌+型号做匹配，同品牌候选直接取第一个（搜索词已足够精准）
+        val candidate = com.zdsj.affiliate.JdGoodsMatcher.pickBest(keyword, candidates)
+            ?: candidates.firstOrNull()
             ?: return null
+        val raw = ingestService.upsert(candidate)
         val price = priceEngine.compute(candidate, assets)
         return mapOf(
             "platform" to platform.code,
-            "itemId" to candidate.platformItemId,
+            "itemId" to raw.platformItemId,
             "title" to candidate.title,
             "shopName" to candidate.shopName,
             "shopType" to candidate.shopType,
             "estimatedFinalPrice" to price.estimatedFinalPrice,
         )
+    }
+
+    /** 从冗长标题提取精简搜索词：取前3个有意义的 token，足够搜到同款又不至于过滤掉结果 */
+    private fun extractBrandModel(title: String): String? {
+        val tokens = com.zdsj.affiliate.JdGoodsMatcher.tokenize(title)
+        if (tokens.isEmpty()) return null
+        return tokens.take(2).joinToString(" ")
     }
 
     private fun crossPlatform(

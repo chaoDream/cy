@@ -8,33 +8,71 @@
 <view wx:else class="page-wrap">
 <scroll-view scroll-y class="page-scroll">
   <!-- 1. 商品基础信息 -->
-  <view class="card prod">
-    <image wx:if="{{data.productInfo.imageUrl}}" class="prod-img" src="{{data.productInfo.imageUrl}}" mode="aspectFill" />
-    <view wx:else class="prod-img prod-img-empty">暂无图片</view>
-    <view class="prod-info">
-      <text class="prod-title">{{data.productInfo.title}}</text>
-      <view class="prod-meta">
-        <text class="tag">{{platformText}}</text>
-        <text class="tag" wx:if="{{shopTypeText}}">{{shopTypeText}}</text>
-        <text class="tag {{item.gov ? 'tag-gov' : ''}}" wx:for="{{productTags}}" wx:key="text">{{item.text}}</text>
+  <view class="card prod-card">
+    <view class="prod-main">
+      <view class="prod-img-wrap">
+        <image wx:if="{{data.productInfo.imageUrl}}" class="prod-img" src="{{data.productInfo.imageUrl}}" mode="aspectFill" />
+        <view wx:else class="prod-img prod-img-empty">暂无图片</view>
+        <view class="prod-img-badge">{{platformBadge}}</view>
       </view>
-      <view class="prod-shop-row">
-        <text class="prod-shop muted">{{data.productInfo.shopName}}</text>
-        <view wx:if="{{shopAlt}}" class="shop-switch" bindtap="onSwitchShop">
-          <text class="shop-switch-text">切换到{{shopAlt.shopTypeText}}</text>
-          <text class="shop-switch-price">¥{{shopAlt.price}}</text>
-          <text class="shop-switch-arrow">›</text>
+      <view class="prod-content">
+        <view class="prod-title-area {{titleOverflow ? 'prod-title-area-tap' : ''}}" bindtap="onTitleTap">
+          <text class="prod-title-measure">{{data.productInfo.title}}</text>
+          <text class="prod-title">{{data.productInfo.title}}</text>
+          <view wx:if="{{titleOverflow}}" class="prod-title-icon">
+            <view class="prod-title-chevron"></view>
+          </view>
         </view>
+        <view class="prod-tags" wx:if="{{displayTags.length}}">
+          <text
+            class="prod-tag {{item.gov ? 'prod-tag-gov' : ''}}"
+            wx:for="{{displayTags}}"
+            wx:key="text"
+          >{{item.text}}</text>
+        </view>
+        <text wx:if="{{showShopName}}" class="prod-shop">{{data.productInfo.shopName}}</text>
       </view>
-      <view class="sku-conf">
-        标准型号：{{data.skuInfo.standardName}}
-        <text class="conf conf-{{data.skuInfo.confidence}}">置信度{{data.skuInfo.confidence}}</text>
-      </view>
-      <view wx:if="{{data.skuInfo.needConfirm}}" class="need-confirm">疑似同款，需谨慎比较</view>
+    </view>
+    <view wx:if="{{showStandardName}}" class="prod-sku">
+      <text class="prod-sku-label">识别型号</text>
+      <text class="prod-sku-name">{{data.skuInfo.standardName}}</text>
+    </view>
+    <view wx:if="{{skuWarning}}" class="prod-alert">
+      <text class="prod-alert-icon">!</text>
+      <text class="prod-alert-text">{{skuWarning}}</text>
     </view>
   </view>
 
-  <!-- 2. AI 购买结论（独立加载，不阻塞首屏） -->
+  <!-- 2. 店铺切换卡片 -->
+  <view wx:if="{{shopAlt}}" class="card shop-alt-card" bindtap="onSwitchShop">
+    <view class="sa-header">
+      <text class="sa-title">同款比价</text>
+      <text class="sa-hint muted">点击切换查看详情</text>
+    </view>
+    <view class="sa-body">
+      <view class="sa-col sa-current">
+        <text class="sa-label">当前</text>
+        <text class="sa-type">{{shopTypeText}}</text>
+        <text class="sa-shop">{{data.productInfo.shopName}}</text>
+        <text class="sa-price" wx:if="{{!data.priceInfo.pricePending}}">¥{{data.priceInfo.finalPriceText}}</text>
+        <text class="sa-price sa-price-pending" wx:else>待获取</text>
+      </view>
+      <view class="sa-arrow-wrap">
+        <text class="sa-arrow">⇄</text>
+      </view>
+      <view class="sa-col sa-alt">
+        <text class="sa-label sa-label-alt">可切换</text>
+        <text class="sa-type">{{shopAlt.shopTypeText}}</text>
+        <text class="sa-shop">{{shopAlt.shopName}}</text>
+        <text class="sa-price sa-price-alt">¥{{shopAlt.price}}</text>
+      </view>
+    </view>
+    <view class="sa-action">
+      <text class="sa-btn">切换到{{shopAlt.shopTypeText}}版本</text>
+    </view>
+  </view>
+
+  <!-- 3. AI 购买结论（独立加载，不阻塞首屏） -->
   <view class="card-plain">
     <ai-conclusion
       loading="{{aiLoading}}"
@@ -196,6 +234,19 @@
       </picker-view-column>
     </picker-view>
     <button class="rp-confirm" catchtap="onRegionConfirm">确认选择</button>
+  </view>
+</view>
+
+<!-- 商品标题全文弹窗 -->
+<view wx:if="{{titleModal.show}}" class="title-mask" bindtap="onCloseTitleModal">
+  <view class="title-panel" catchtap="noop">
+    <view class="title-panel-header">
+      <text class="title-panel-label">商品标题</text>
+      <text class="title-panel-close" catchtap="onCloseTitleModal">✕</text>
+    </view>
+    <scroll-view scroll-y class="title-panel-body">
+      <text class="title-panel-text">{{data.productInfo.title}}</text>
+    </scroll-view>
   </view>
 </view>
 

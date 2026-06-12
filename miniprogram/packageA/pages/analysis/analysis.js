@@ -67,6 +67,57 @@ function nearestProvince(lat, lng) {
   return best.name;
 }
 
+/** 判断两段文案是否高度重复（用于隐藏与标题雷同的标准型号） */
+function isSimilarText(a, b) {
+  if (!a || !b) return true;
+  const norm = (s) => s.replace(/[\s·\-+/,，、]/g, '').toLowerCase();
+  const na = norm(a);
+  const nb = norm(b);
+  if (na === nb || na.includes(nb) || nb.includes(na)) return true;
+  const tokensA = new Set(a.split(/[\s·\-+/,，、]+/).filter((t) => t.length > 1));
+  const tokensB = b.split(/[\s·\-+/,，、]+/).filter((t) => t.length > 1);
+  if (!tokensB.length) return true;
+  const overlap = tokensB.filter((t) => tokensA.has(t)).length;
+  return overlap / tokensB.length >= 0.65;
+}
+
+/** 过滤与平台/店铺类型重复的活动标签 */
+function dedupeProductTags(platformText, shopTypeText, productTags) {
+  const redundant = new Set([
+    platformText,
+    shopTypeText,
+    `${platformText}${shopTypeText}`,
+    `${platformText}·${shopTypeText}`,
+    `${platformText}自营`,
+    '京东自营',
+    '拼多多官方',
+  ].filter(Boolean));
+  return productTags.filter((t) => !redundant.has(t.text));
+}
+
+function buildProdView(res, platformText, shopTypeText, productTags, shopAlt) {
+  const platformBadge = shopTypeText ? `${platformText} · ${shopTypeText}` : platformText;
+  const displayTags = dedupeProductTags(platformText, shopTypeText, productTags);
+  const title = (res.productInfo && res.productInfo.title) || '';
+  const standardName = (res.skuInfo && res.skuInfo.standardName) || '';
+  const showStandardName = standardName && !isSimilarText(title, standardName);
+  const confidence = (res.skuInfo && res.skuInfo.confidence) || '';
+  const needConfirm = !!(res.skuInfo && res.skuInfo.needConfirm);
+  let skuWarning = '';
+  if (needConfirm) {
+    skuWarning = '疑似同款，型号匹配置信度较低，切换店铺前请仔细核对规格';
+  } else if (confidence === 'mid') {
+    skuWarning = '型号匹配置信度中等，建议核对规格后再购买';
+  }
+  return {
+    platformBadge,
+    displayTags,
+    showStandardName,
+    skuWarning,
+    showShopName: !shopAlt && !!(res.productInfo && res.productInfo.shopName),
+  };
+}
+
 Page({
   data: {
     loading: true,
@@ -84,6 +135,13 @@ Page({
     aiError: '',
     watchModal: { show: false },
     shopAlt: null,
+    platformBadge: '',
+    displayTags: [],
+    showStandardName: false,
+    skuWarning: '',
+    showShopName: true,
+    titleOverflow: false,
+    titleModal: { show: false },
     // 国补定位弹窗
     locModal: { show: false },
     regionPicker: { show: false },
@@ -94,6 +152,15 @@ Page({
   onLoad(query) {
     const { platform, itemId } = query;
     this.setData({ platform, itemId });
+    if (query.fromItemId) {
+      this._fromItem = {
+        itemId: query.fromItemId,
+        platform: query.fromPlatform || platform,
+        shopType: query.fromShopType || '',
+        shopName: decodeURIComponent(query.fromShopName || ''),
+        price: query.fromPrice || '',
+      };
+    }
     this._load();
   },
 
@@ -107,6 +174,8 @@ Page({
       aiLoading: true,
       aiRecommendation: null,
       aiError: '',
+      titleOverflow: false,
+      titleModal: { show: false },
     });
     this._loadAi(platform, itemId, assets);
     api
@@ -134,33 +203,76 @@ Page({
           gov: /国补/.test(t),
         }));
         const alt = res.shopAlternative;
-        const shopAlt = alt ? {
-          itemId: alt.itemId,
-          platform: alt.platform,
-          shopType: alt.shopType,
-          shopTypeText: shopTypeName(alt.shopType),
-          shopName: alt.shopName,
-          price: yuan(alt.estimatedFinalPrice),
-        } : null;
+        let shopAlt = null;
+        if (alt) {
+          shopAlt = {
+            itemId: alt.itemId,
+            platform: alt.platform,
+            shopType: alt.shopType,
+            shopTypeText: shopTypeName(alt.shopType),
+            shopName: alt.shopName,
+            price: yuan(alt.estimatedFinalPrice),
+          };
+        } else if (this._fromItem) {
+          const fi = this._fromItem;
+          shopAlt = {
+            itemId: fi.itemId,
+            platform: fi.platform,
+            shopType: fi.shopType,
+            shopTypeText: shopTypeName(fi.shopType),
+            shopName: fi.shopName,
+            price: fi.price,
+          };
+        }
+        const platformText = platformName(res.productInfo.platform);
+        const shopTypeText = shopTypeName(res.productInfo.shopType);
+        const prodView = buildProdView(res, platformText, shopTypeText, productTags, shopAlt);
         this.setData({
           loading: false,
           data: res,
-          platformText: platformName(res.productInfo.platform),
-          shopTypeText: shopTypeName(res.productInfo.shopType),
+          platformText,
+          shopTypeText,
           productTags,
           crossView,
           sameItemBuyable,
           shopAlt,
+          ...prodView,
         });
         track.event('analysis_view', {
           platform: this.data.platform,
           is_price_compare: !sameItemBuyable,
         });
         this._checkGovLocationPopup(productTags);
+        this._checkTitleOverflow();
       }))
       .catch((err) => {
         this.setData({ loading: false, error: err.message || '加载失败' });
       });
+  },
+
+  _checkTitleOverflow() {
+    wx.nextTick(() => {
+      const q = wx.createSelectorQuery().in(this);
+      q.select('.prod-title-measure').boundingClientRect();
+      q.select('.prod-title').boundingClientRect();
+      q.exec((res) => {
+        const full = res[0];
+        const clamped = res[1];
+        const overflow = !!(full && clamped && full.height > clamped.height + 1);
+        if (overflow !== this.data.titleOverflow) {
+          this.setData({ titleOverflow: overflow });
+        }
+      });
+    });
+  },
+
+  onTitleTap() {
+    if (!this.data.titleOverflow) return;
+    this.setData({ 'titleModal.show': true });
+  },
+
+  onCloseTitleModal() {
+    this.setData({ 'titleModal.show': false });
   },
 
   _loadAi(platform, itemId, assets, forceRule = false) {
@@ -380,8 +492,20 @@ Page({
   onSwitchShop() {
     const alt = this.data.shopAlt;
     if (!alt) return;
+    const cur = this.data.data;
+    const curPrice = cur.priceInfo && !cur.priceInfo.pricePending
+      ? cur.priceInfo.finalPriceText : '';
+    const params = [
+      `platform=${alt.platform}`,
+      `itemId=${alt.itemId}`,
+      `fromItemId=${this.data.itemId}`,
+      `fromPlatform=${this.data.platform}`,
+      `fromShopType=${cur.productInfo.shopType || ''}`,
+      `fromShopName=${encodeURIComponent(cur.productInfo.shopName || '')}`,
+      `fromPrice=${curPrice}`,
+    ].join('&');
     wx.redirectTo({
-      url: `/packageA/pages/analysis/analysis?platform=${alt.platform}&itemId=${alt.itemId}`,
+      url: `/packageA/pages/analysis/analysis?${params}`,
     });
   },
 

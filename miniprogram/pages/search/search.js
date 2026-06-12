@@ -6,18 +6,33 @@ const { prepareImageForDisplay, prepareListImages } = require('../../utils/image
 
 const app = getApp();
 
+const RECENT_VISIBLE_COUNT = 6; // 首页最多展示2行（3列×2行）
+const RECENT_STORAGE_LIMIT = 50;
+const RECENT_PAGE_SIZE = 12;
+
 Page({
   data: {
     linkText: '',
     assets: {},
     recent: [],
+    recentVisible: [],
+    recentHasMore: false,
     searchResults: [],
     clipboardHint: '',
+    // 最近查询弹窗
+    showRecentPopup: false,
+    recentPopupList: [],
+    recentPopupPage: 1,
+    recentPopupHasMore: false,
+    recentPopupLoading: false,
+    // 推荐
+    recommendList: [],
   },
 
   onLoad() {
     this.setData({ assets: app.getAssets() });
     this._loadRecent();
+    this._loadRecommend();
   },
 
   /** 历史图存相对路径；展示时按当前 API 地址（真机/远程）重新拼完整 URL */
@@ -29,13 +44,77 @@ Page({
       title: r.title,
       imageUrl: this._toRelativeImage(r.imageUrl),
     }));
-    // 回写规范化后的相对路径，清掉 storage 里残留的 127.0.0.1 等绝对地址
     if (normalized.length && JSON.stringify(normalized) !== JSON.stringify(raw)) {
       wx.setStorageSync('recentQueries', normalized);
     }
     prepareListImages(
       normalized.map((r) => ({ ...r, _imgErr: false })),
-    ).then((recent) => this.setData({ recent }));
+    ).then((recent) => {
+      const recentVisible = recent.slice(0, RECENT_VISIBLE_COUNT);
+      this.setData({ recent, recentVisible, recentHasMore: recent.length > RECENT_VISIBLE_COUNT });
+    });
+  },
+
+  _loadRecommend() {
+    api
+      .rank()
+      .then((list) => {
+        if (!list || !list.length) return;
+        return prepareListImages(
+          list.slice(0, 12).map((r) => ({
+            ...r,
+            itemId: r.platformItemId,
+            _imgErr: false,
+          })),
+        );
+      })
+      .then((recommendList) => {
+        if (recommendList && recommendList.length) this.setData({ recommendList });
+      })
+      .catch(() => {});
+  },
+
+  onShowRecentPopup() {
+    const page = 1;
+    this._loadRecentPopupPage(page);
+    this.setData({ showRecentPopup: true, recentPopupPage: page });
+  },
+
+  onCloseRecentPopup() {
+    this.setData({ showRecentPopup: false });
+  },
+
+  onPreventBubble() {},
+
+  onRecentPopupLoadMore() {
+    if (this.data.recentPopupLoading || !this.data.recentPopupHasMore) return;
+    const nextPage = this.data.recentPopupPage + 1;
+    this._loadRecentPopupPage(nextPage);
+  },
+
+  _loadRecentPopupPage(page) {
+    this.setData({ recentPopupLoading: true });
+    const all = this.data.recent;
+    const start = 0;
+    const end = page * RECENT_PAGE_SIZE;
+    const pageItems = all.slice(start, end);
+    this.setData({
+      recentPopupList: pageItems,
+      recentPopupPage: page,
+      recentPopupHasMore: end < all.length,
+      recentPopupLoading: false,
+    });
+  },
+
+  onRecentPopupTap(e) {
+    const { platform, itemid } = e.currentTarget.dataset;
+    this.setData({ showRecentPopup: false });
+    this._gotoAnalysis(platform, itemid);
+  },
+
+  onRecommendTap(e) {
+    const { platform, itemid } = e.currentTarget.dataset;
+    this._gotoAnalysis(platform, itemid);
   },
 
   _toRelativeImage(url) {
@@ -160,10 +239,11 @@ Page({
       title: res.productInfo.title,
       imageUrl: res.productInfo.imageUrl,
     });
-    const next = stored.slice(0, 10);
+    const next = stored.slice(0, RECENT_STORAGE_LIMIT);
     wx.setStorageSync('recentQueries', next);
-    prepareListImages(next.map((r) => ({ ...r, _imgErr: false }))).then((recent) =>
-      this.setData({ recent }),
-    );
+    prepareListImages(next.map((r) => ({ ...r, _imgErr: false }))).then((recent) => {
+      const recentVisible = recent.slice(0, RECENT_VISIBLE_COUNT);
+      this.setData({ recent, recentVisible, recentHasMore: recent.length > RECENT_VISIBLE_COUNT });
+    });
   },
 });

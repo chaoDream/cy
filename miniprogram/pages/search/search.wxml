@@ -26,17 +26,20 @@
 
   <!-- 搜索结果 -->
   <view wx:if="{{searchResults.length}}" class="section">
-    <view class="section-title">搜索结果</view>
+    <view class="section-header"><text class="section-title">搜索结果</text></view>
     <product-card wx:for="{{searchResults}}" wx:key="itemId" item="{{item}}" bind:tap="onCardTap" />
   </view>
 
-  <!-- 今日脱水爆款（占位，运营维护） -->
+  <!-- 最近查询 -->
   <view class="section">
-    <view class="section-title">最近查询</view>
-    <view wx:if="{{recent.length}}" class="recent-list">
+    <view class="section-header">
+      <text class="section-title">最近查询</text>
+      <text wx:if="{{recentHasMore}}" class="section-more" bindtap="onShowRecentPopup">更多 ›</text>
+    </view>
+    <view wx:if="{{recentVisible.length}}" class="recent-list">
       <view
         class="recent-item"
-        wx:for="{{recent}}"
+        wx:for="{{recentVisible}}"
         wx:key="itemId"
         data-platform="{{item.platform}}"
         data-itemid="{{item.itemId}}"
@@ -56,5 +59,74 @@
       </view>
     </view>
     <view wx:else class="empty">还没有查询记录，粘贴一个链接试试吧</view>
+  </view>
+
+  <!-- 好价推荐 -->
+  <view class="section" wx:if="{{recommendList.length}}">
+    <view class="section-header">
+      <text class="section-title">好价推荐</text>
+    </view>
+    <view class="recommend-list">
+      <view
+        class="recommend-item"
+        wx:for="{{recommendList}}"
+        wx:key="platformItemId"
+        data-platform="{{item.platform}}"
+        data-itemid="{{item.platformItemId}}"
+        bindtap="onRecommendTap"
+      >
+        <image
+          wx:if="{{item.imageUrl && !item._imgErr}}"
+          class="recommend-img"
+          src="{{item.imageUrl}}"
+          mode="aspectFill"
+          lazy-load
+        />
+        <view wx:else class="recommend-img recommend-img-placeholder">无图</view>
+        <text class="recommend-title">{{item.title || item.standardName}}</text>
+        <view class="recommend-price-row">
+          <text class="recommend-price">¥{{item.bestFinalPrice}}</text>
+          <text class="recommend-platform">{{item.platform === 'jd' ? '京东' : '拼多多'}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 最近查询弹窗 -->
+  <view class="popup-mask" wx:if="{{showRecentPopup}}" bindtap="onCloseRecentPopup">
+    <view class="popup-content" catchtap="onPreventBubble">
+      <view class="popup-header">
+        <text class="popup-title">查询记录</text>
+        <text class="popup-close" bindtap="onCloseRecentPopup">×</text>
+      </view>
+      <scroll-view
+        class="popup-scroll"
+        scroll-y
+        bindscrolltolower="onRecentPopupLoadMore"
+      >
+        <view class="popup-list">
+          <view
+            class="popup-item"
+            wx:for="{{recentPopupList}}"
+            wx:key="itemId"
+            data-platform="{{item.platform}}"
+            data-itemid="{{item.itemId}}"
+            bindtap="onRecentPopupTap"
+          >
+            <image
+              wx:if="{{item.imageUrl && !item._imgErr}}"
+              class="popup-item-img"
+              src="{{item.imageUrl}}"
+              mode="aspectFill"
+              lazy-load
+            />
+            <view wx:else class="popup-item-img popup-item-img-placeholder">无图</view>
+            <text class="popup-item-title">{{item.title}}</text>
+          </view>
+        </view>
+        <view wx:if="{{recentPopupLoading}}" class="popup-loading">加载中...</view>
+        <view wx:elif="{{!recentPopupHasMore && recentPopupList.length}}" class="popup-end">没有更多了</view>
+      </scroll-view>
+    </view>
   </view>
 </view>
