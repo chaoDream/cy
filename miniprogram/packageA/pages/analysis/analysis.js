@@ -95,8 +95,9 @@ function dedupeProductTags(platformText, shopTypeText, productTags) {
   return productTags.filter((t) => !redundant.has(t.text));
 }
 
-function buildProdView(res, platformText, shopTypeText, productTags, shopAlt) {
-  const platformBadge = shopTypeText ? `${platformText} · ${shopTypeText}` : platformText;
+function buildProdView(res, platformText, shopTypeText, productTags) {
+  const isSelfShop = (res.productInfo && res.productInfo.shopType) === 'self';
+  const shopSelfTag = isSelfShop ? '自营' : '非自营';
   const displayTags = dedupeProductTags(platformText, shopTypeText, productTags);
   const title = (res.productInfo && res.productInfo.title) || '';
   const standardName = (res.skuInfo && res.skuInfo.standardName) || '';
@@ -110,11 +111,11 @@ function buildProdView(res, platformText, shopTypeText, productTags, shopAlt) {
     skuWarning = '型号匹配置信度中等，建议核对规格后再购买';
   }
   return {
-    platformBadge,
+    isSelfShop,
+    shopSelfTag,
     displayTags,
     showStandardName,
     skuWarning,
-    showShopName: !shopAlt && !!(res.productInfo && res.productInfo.shopName),
   };
 }
 
@@ -135,11 +136,11 @@ Page({
     aiError: '',
     watchModal: { show: false },
     shopAlt: null,
-    platformBadge: '',
+    isSelfShop: false,
+    shopSelfTag: '',
     displayTags: [],
     showStandardName: false,
     skuWarning: '',
-    showShopName: true,
     titleOverflow: false,
     titleModal: { show: false },
     // 国补定位弹窗
@@ -226,7 +227,7 @@ Page({
         }
         const platformText = platformName(res.productInfo.platform);
         const shopTypeText = shopTypeName(res.productInfo.shopType);
-        const prodView = buildProdView(res, platformText, shopTypeText, productTags, shopAlt);
+        const prodView = buildProdView(res, platformText, shopTypeText, productTags);
         this.setData({
           loading: false,
           data: res,

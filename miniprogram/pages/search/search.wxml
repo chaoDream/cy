@@ -90,6 +90,8 @@
         </view>
       </view>
     </view>
+    <view wx:if="{{recommendLoading}}" class="recommend-footer">加载中...</view>
+    <view wx:elif="{{recommendNoMore}}" class="recommend-footer">已经到底了</view>
   </view>
 
   <!-- 最近查询弹窗 -->

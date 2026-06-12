@@ -9,6 +9,7 @@ const app = getApp();
 const RECENT_VISIBLE_COUNT = 6; // 首页最多展示2行（3列×2行）
 const RECENT_STORAGE_LIMIT = 50;
 const RECENT_PAGE_SIZE = 12;
+const RECOMMEND_PAGE_SIZE = 6;
 
 Page({
   data: {
@@ -26,7 +27,10 @@ Page({
     recentPopupHasMore: false,
     recentPopupLoading: false,
     // 推荐
+    _recommendAll: [],
     recommendList: [],
+    recommendLoading: false,
+    recommendNoMore: false,
   },
 
   onLoad() {
@@ -57,21 +61,41 @@ Page({
 
   _loadRecommend() {
     api
-      .rank()
+      .recommend()
       .then((list) => {
         if (!list || !list.length) return;
-        return prepareListImages(
-          list.slice(0, 12).map((r) => ({
-            ...r,
-            itemId: r.platformItemId,
-            _imgErr: false,
-          })),
-        );
-      })
-      .then((recommendList) => {
-        if (recommendList && recommendList.length) this.setData({ recommendList });
+        const all = list.map((r) => ({ ...r, itemId: r.platformItemId, _imgErr: false }));
+        this._recommendAllRaw = all;
+        this._recommendPage = 0;
+        this.setData({ recommendList: [], recommendNoMore: false });
+        this._loadMoreRecommend();
       })
       .catch(() => {});
+  },
+
+  _loadMoreRecommend() {
+    if (this.data.recommendLoading || this.data.recommendNoMore) return;
+    const all = this._recommendAllRaw || [];
+    const page = (this._recommendPage || 0) + 1;
+    const end = page * RECOMMEND_PAGE_SIZE;
+    const slice = all.slice(this.data.recommendList.length, end);
+    if (!slice.length) {
+      this.setData({ recommendNoMore: true });
+      return;
+    }
+    this.setData({ recommendLoading: true });
+    prepareListImages(slice).then((prepared) => {
+      this._recommendPage = page;
+      this.setData({
+        recommendList: this.data.recommendList.concat(prepared),
+        recommendLoading: false,
+        recommendNoMore: end >= all.length,
+      });
+    });
+  },
+
+  onReachBottom() {
+    this._loadMoreRecommend();
   },
 
   onShowRecentPopup() {

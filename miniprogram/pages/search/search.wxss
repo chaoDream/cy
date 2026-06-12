@@ -148,6 +148,12 @@
   padding: 2rpx 12rpx;
   border-radius: 6rpx;
 }
+.recommend-footer {
+  text-align: center;
+  color: #b0b4ba;
+  font-size: 24rpx;
+  padding: 24rpx 0 16rpx;
+}
 
 /* 最近查询弹窗 */
 .popup-mask {

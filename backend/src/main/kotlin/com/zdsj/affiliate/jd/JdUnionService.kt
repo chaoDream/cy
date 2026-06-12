@@ -64,6 +64,11 @@ class JdUnionService(
         return extractGoodsList(data).mapNotNull { mapGoodsNode(it, keyword) }
     }
 
+    fun jingfen(eliteId: Int, pageSize: Int): List<AffiliateItem> {
+        val data = client.queryJingfen(eliteId, pageSize) ?: return emptyList()
+        return extractGoodsList(data).mapNotNull { mapGoodsNode(it, "") }
+    }
+
     /**
      * 单品推广转链。京东规则：sceneId=1 仅支持 jingfen 联盟链；item.jd.com 须 sceneId=2（需联盟权限）。
      * sceneId=1 + item.jd.com 会落到活动推广页（如「又好又便宜」），非商品详情。

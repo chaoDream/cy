@@ -34,16 +34,24 @@
 /* ============ 商品详情卡片 ============ */
 .prod-card { padding: 24rpx; }
 .prod-main { display: flex; gap: 20rpx; }
-.prod-img-wrap {
-  position: relative;
+.prod-img-shadow {
   flex-shrink: 0;
   width: 200rpx;
   height: 200rpx;
+  border-radius: 16rpx;
+  box-shadow: 0 6rpx 20rpx rgba(0, 0, 0, 0.1), 0 2rpx 8rpx rgba(0, 0, 0, 0.06);
+}
+.prod-img-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 16rpx;
+  overflow: hidden;
 }
 .prod-img {
   width: 200rpx;
   height: 200rpx;
-  border-radius: 16rpx;
+  display: block;
   background: #f7f8fa;
 }
 .prod-img-empty {
@@ -53,21 +61,54 @@
   font-size: 22rpx;
   color: #8a9099;
 }
-.prod-img-badge {
+.prod-img-self {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 84rpx;
+  height: 84rpx;
+  overflow: hidden;
+  z-index: 2;
+  pointer-events: none;
+}
+.prod-img-self-text {
+  position: absolute;
+  top: 16rpx;
+  right: -24rpx;
+  width: 108rpx;
+  padding: 5rpx 0;
+  font-size: 18rpx;
+  font-weight: 600;
+  text-align: center;
+  transform: rotate(45deg);
+  line-height: 1.2;
+  letter-spacing: 1rpx;
+}
+.prod-img-self-yes .prod-img-self-text {
+  background: linear-gradient(135deg, #ff7875 0%, #f5222d 100%);
+  color: #fff;
+  box-shadow: 0 2rpx 8rpx rgba(245, 34, 45, 0.35);
+}
+.prod-img-self-no .prod-img-self-text {
+  background: rgba(255, 255, 255, 0.96);
+  color: #646a73;
+  box-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.12);
+}
+.prod-img-shop {
   position: absolute;
   left: 0;
-  bottom: 0;
   right: 0;
-  padding: 6rpx 12rpx;
-  background: rgba(0, 0, 0, 0.55);
+  bottom: 0;
+  padding: 8rpx 10rpx;
+  background: rgba(0, 0, 0, 0.58);
   color: #fff;
-  font-size: 20rpx;
-  font-weight: 500;
+  font-size: 18rpx;
+  line-height: 1.3;
   text-align: center;
-  border-radius: 0 0 16rpx 16rpx;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  z-index: 2;
 }
 .prod-content {
   flex: 1;
@@ -140,13 +181,6 @@
   color: #d4380d;
   background: #fff2e8;
   font-weight: 500;
-}
-.prod-shop {
-  font-size: 24rpx;
-  color: #8a9099;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .prod-sku {
   display: flex;

@@ -10,10 +10,15 @@
   <!-- 1. 商品基础信息 -->
   <view class="card prod-card">
     <view class="prod-main">
-      <view class="prod-img-wrap">
-        <image wx:if="{{data.productInfo.imageUrl}}" class="prod-img" src="{{data.productInfo.imageUrl}}" mode="aspectFill" />
-        <view wx:else class="prod-img prod-img-empty">暂无图片</view>
-        <view class="prod-img-badge">{{platformBadge}}</view>
+      <view class="prod-img-shadow">
+        <view class="prod-img-wrap">
+          <image wx:if="{{data.productInfo.imageUrl}}" class="prod-img" src="{{data.productInfo.imageUrl}}" mode="aspectFill" />
+          <view wx:else class="prod-img prod-img-empty">暂无图片</view>
+          <view class="prod-img-self {{isSelfShop ? 'prod-img-self-yes' : 'prod-img-self-no'}}">
+            <text class="prod-img-self-text">{{shopSelfTag}}</text>
+          </view>
+          <view wx:if="{{data.productInfo.shopName}}" class="prod-img-shop">{{data.productInfo.shopName}}</view>
+        </view>
       </view>
       <view class="prod-content">
         <view class="prod-title-area {{titleOverflow ? 'prod-title-area-tap' : ''}}" bindtap="onTitleTap">
@@ -30,7 +35,6 @@
             wx:key="text"
           >{{item.text}}</text>
         </view>
-        <text wx:if="{{showShopName}}" class="prod-shop">{{data.productInfo.shopName}}</text>
       </view>
     </view>
     <view wx:if="{{showStandardName}}" class="prod-sku">
