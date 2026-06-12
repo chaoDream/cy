@@ -21,6 +21,7 @@ class WebConfig(
                 "/api/product/ai-recommendation",
                 "/api/product/image",    // 商品主图代理
                 "/api/product/search",   // 游客可搜索
+                "/api/product/recommend", // 游客可看推荐
                 "/api/rank/**",          // 游客可看榜单
                 "/api/track/event",      // 游客可埋点(app_open 等)
                 "/api/admin/**",         // 后台另行鉴权(MVP 简化)

@@ -74,7 +74,7 @@ class JdUnionClient(
         val body = mutableMapOf<String, Any>(
             "pageIndex" to 1,
             "pageSize" to pageSize,
-            "fields" to "skuId,skuName,price,imageInfo,imgUrl,shopInfo,owner,couponInfo,materialUrl",
+            "fields" to "skuId,spuId,skuName,brandName,categoryInfo,categoryName,price,imageInfo,imgUrl,shopInfo,owner,couponInfo,materialUrl",
         )
         skuIds?.takeIf { it.isNotEmpty() }?.let { body["skuIds"] = it.joinToString(",") }
         keyword?.takeIf { it.isNotBlank() }?.let { body["keyword"] = it }

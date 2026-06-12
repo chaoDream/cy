@@ -106,6 +106,25 @@ zdsj:
     poll-hot-cron: "0 0 */2 * * ?"     # 热门 SKU 每 2h
     poll-user-cron: "0 30 */4 * * ?"   # 用户关注 每 4h
     poll-normal-cron: "0 0 4 * * ?"    # 普通 每天 04:00
+  catalog-sync:
+    # 定时从京东/拼多多搜索充盈品牌型号目录（catalog_brand / catalog_model）
+    enabled: ${CATALOG_SYNC_ENABLED:false}
+    poll-cron: "0 0 3 ? * MON"          # 默认每周一 03:00
+    search-limit: 20
+    platforms: [jd, pdd]
+    include-known-brands: true
+    max-brand-keywords: 15
+    keywords:
+      - 智能手机
+      - 5G手机
+      - iPhone
+      - 华为 Mate
+      - 小米
+      - 一加
+      - vivo
+      - OPPO
+      - 荣耀
+      - 三星 Galaxy
   price-seed:
     # 冷启动历史价：配商品名称 → 自动在京东/拼多多搜索 → 每天采价攒曲线
     # 长清单可放到 backend/price-seeds.yml（spring.config.import 自动加载）

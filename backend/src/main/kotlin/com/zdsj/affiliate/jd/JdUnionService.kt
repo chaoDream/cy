@@ -197,6 +197,7 @@ class JdUnionService(
             "g" -> "self"
             else -> "thirdparty"
         }
+        val meta = JdUnionMetadata.fromGoodsNode(node)
         val govSubsidy = com.zdsj.affiliate.GovSubsidyParser.parse(node)
         val tags = buildList {
             if (shopType == "self") add("京东自营")
@@ -229,6 +230,9 @@ class JdUnionService(
             freight = BigDecimal.ZERO,
             activityTags = tags,
             sourceUrl = node.path("materialUrl").asText(null),
+            platformBrand = meta.brandName,
+            platformSpuId = meta.spuId,
+            platformCategory = meta.category,
         )
     }
 

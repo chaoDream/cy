@@ -24,4 +24,9 @@ data class AffiliateItem(
     val freight: BigDecimal,
     val activityTags: List<String>,
     val sourceUrl: String?,
+    /** 京东联盟等平台返回的官方品牌名 */
+    val platformBrand: String? = null,
+    val platformSpuId: String? = null,
+    /** 平台类目路径，如「手机通讯/手机」 */
+    val platformCategory: String? = null,
 )

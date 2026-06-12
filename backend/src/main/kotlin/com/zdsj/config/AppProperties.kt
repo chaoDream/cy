@@ -174,3 +174,30 @@ data class PriceSeedProperties(
 
     fun enabledItems(): List<SeedItem> = items.filter { it.enabled && it.isNameMode() }
 }
+
+/** 品牌 / 型号目录定时同步（从京东、拼多多搜索充盈 catalog 表） */
+@ConfigurationProperties(prefix = "zdsj.catalog-sync")
+data class CatalogSyncProperties(
+    val enabled: Boolean = false,
+    /** 默认定时：每周一 03:00 */
+    val pollCron: String = "0 0 3 ? * MON",
+    val searchLimit: Int = 20,
+    val platforms: List<String> = listOf("jd", "pdd"),
+    /** 固定搜索词 */
+    val keywords: List<String> = listOf(
+        "智能手机", "5G手机", "iPhone", "华为 Mate", "小米", "一加", "vivo", "OPPO", "荣耀",
+    ),
+    /** 为 true 时，每次同步会把已入库品牌名也作为搜索词（上限 max-brand-keywords） */
+    val includeKnownBrands: Boolean = true,
+    val maxBrandKeywords: Int = 15,
+) {
+    fun resolvedKeywords(catalogReader: com.zdsj.sku.SkuCatalogReader): List<String> { // injected at runtime
+        val base = keywords.map { it.trim() }.filter { it.isNotBlank() }.toMutableSet()
+        if (includeKnownBrands) {
+            catalogReader.activeBrandNames()
+                .take(maxBrandKeywords)
+                .forEach { base.add(it) }
+        }
+        return base.toList()
+    }
+}

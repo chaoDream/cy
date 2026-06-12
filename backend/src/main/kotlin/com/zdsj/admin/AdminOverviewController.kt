@@ -1,7 +1,9 @@
 package com.zdsj.admin
 
 import com.zdsj.common.ApiResponse
+import com.zdsj.config.CatalogSyncProperties
 import com.zdsj.config.PriceSeedProperties
+import com.zdsj.catalog.CatalogSyncJob
 import com.zdsj.price.SeedPricePollingJob
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.ObjectProvider
@@ -25,14 +27,17 @@ class AdminOverviewController(
     private val jdbc: JdbcTemplate,
     private val redis: StringRedisTemplate,
     private val seedProps: PriceSeedProperties,
+    private val catalogSyncProps: CatalogSyncProperties,
     /** 采价任务是条件化 Bean（zdsj.price-seed.enabled=true 才存在），用 Provider 可选注入。 */
     private val pollingJob: ObjectProvider<SeedPricePollingJob>,
+    private val catalogSyncJob: ObjectProvider<CatalogSyncJob>,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
     /** 关注的业务表（flyway_schema_history 等系统表不展示），按业务重要度排序。 */
     private val businessTables = listOf(
         "product_raw", "product_sku", "product_spu", "product_mapping",
+        "catalog_brand", "catalog_model",
         "price_snapshot", "price_seed_binding", "promotion_rule",
         "watch_item", "alert_hit_record",
         "app_user", "user_profile", "user_feedback",
@@ -47,6 +52,7 @@ class AdminOverviewController(
                 "tables" to tableCounts(),
                 "priceSnapshot" to priceSnapshotStats(),
                 "priceSeed" to priceSeedConfig(),
+                "catalogSync" to catalogSyncConfig(),
                 "redis" to redisOverview(),
             ),
         )
@@ -72,6 +78,36 @@ class AdminOverviewController(
             ),
         )
     }
+
+    /**
+     * 手动立即同步品牌型号目录（测试 / 补采）。
+     * 需 zdsj.catalog-sync.enabled=true。
+     */
+    @PostMapping("/catalog-sync/run")
+    fun runCatalogSync(): ApiResponse<Map<String, Any?>> {
+        val job = catalogSyncJob.ifAvailable
+            ?: return ApiResponse.fail(4004, "目录同步未启用（zdsj.catalog-sync.enabled=false）")
+        log.info("收到手动目录同步请求")
+        val r = job.runOnce("手动")
+        return ApiResponse.ok(
+            mapOf(
+                "keywordCount" to r.keywordCount,
+                "itemCount" to r.itemCount,
+                "brandsUpserted" to r.brandsUpserted,
+                "modelsUpserted" to r.modelsUpserted,
+                "failed" to r.failed,
+                "durationMs" to r.durationMs,
+                "failures" to r.failures,
+            ),
+        )
+    }
+
+    private fun catalogSyncConfig(): Map<String, Any?> = mapOf(
+        "enabled" to catalogSyncProps.enabled,
+        "pollCron" to catalogSyncProps.pollCron,
+        "keywordCount" to catalogSyncProps.keywords.size,
+        "platforms" to catalogSyncProps.platforms,
+    )
 
     /** 各业务表行数（单表查询失败不影响整体）。 */
     private fun tableCounts(): List<Map<String, Any?>> = businessTables.map { table ->

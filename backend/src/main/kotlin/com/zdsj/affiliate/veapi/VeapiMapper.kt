@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.zdsj.affiliate.AffiliateItem
 import com.zdsj.affiliate.Platform
 import com.zdsj.affiliate.jd.JdPriceMath
+import com.zdsj.affiliate.jd.JdUnionMetadata
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
@@ -29,6 +30,7 @@ class VeapiMapper {
             ?: node.path("unitPrice").positiveDecimalOrNull()
             ?: BigDecimal.ZERO
         val shopType = if (node.path("isJdSale").asInt(0) == 1) "self" else "thirdparty"
+        val meta = JdUnionMetadata.fromGoodsNode(node)
         return build(
             platform = Platform.JD,
             itemId = skuId,
@@ -40,6 +42,9 @@ class VeapiMapper {
             sourceUrl = node.path("materialUrl").asText(null),
             tags = buildList { if (shopType == "self") add("京东自营"); add("维易·京东联盟") },
             context = "jd_promotiongoodsinfo",
+            platformBrand = meta.brandName,
+            platformSpuId = meta.spuId,
+            platformCategory = meta.category,
         )
     }
 
@@ -75,6 +80,7 @@ class VeapiMapper {
         val govSubsidy = com.zdsj.affiliate.GovSubsidyParser.parse(node)
         val purchasePrice = node.path("purchasePriceInfo").path("purchasePrice").positiveDecimalOrNull()
         val shopType = if (node.path("owner").asText("") == "g") "self" else "thirdparty"
+        val meta = JdUnionMetadata.fromGoodsNode(node)
         return build(
             platform = Platform.JD,
             itemId = itemId,
@@ -100,6 +106,9 @@ class VeapiMapper {
                 govSubsidy?.let { add(com.zdsj.affiliate.GovSubsidyParser.tag(it["govSubsidyType"] as? Int)) }
             },
             context = "jd_search",
+            platformBrand = meta.brandName,
+            platformSpuId = meta.spuId,
+            platformCategory = meta.category,
         )
     }
 
@@ -152,6 +161,9 @@ class VeapiMapper {
         sourceUrl: String?,
         tags: List<String>,
         context: String,
+        platformBrand: String? = null,
+        platformSpuId: String? = null,
+        platformCategory: String? = null,
     ): AffiliateItem? {
         if (itemId.isNullOrBlank() || title.isNullOrBlank()) {
             log.warn("[veapi] 映射校验失败 context={} itemId={} hasTitle={}", context, itemId, !title.isNullOrBlank())
@@ -170,6 +182,9 @@ class VeapiMapper {
             freight = BigDecimal.ZERO,
             activityTags = tags.ifEmpty { listOf("维易") },
             sourceUrl = sourceUrl,
+            platformBrand = platformBrand,
+            platformSpuId = platformSpuId,
+            platformCategory = platformCategory,
         )
     }
 

@@ -40,19 +40,27 @@
     "list": [
       {
         "pagePath": "pages/search/search",
-        "text": "查价"
+        "text": "查价",
+        "iconPath": "assets/tabbar/search.png",
+        "selectedIconPath": "assets/tabbar/search_active.png"
       },
       {
         "pagePath": "pages/rank/rank",
-        "text": "低价榜"
+        "text": "低价榜",
+        "iconPath": "assets/tabbar/rank.png",
+        "selectedIconPath": "assets/tabbar/rank_active.png"
       },
       {
         "pagePath": "pages/watch/watch",
-        "text": "盯价"
+        "text": "盯价",
+        "iconPath": "assets/tabbar/watch.png",
+        "selectedIconPath": "assets/tabbar/watch_active.png"
       },
       {
         "pagePath": "pages/mine/mine",
-        "text": "我的"
+        "text": "我的",
+        "iconPath": "assets/tabbar/mine.png",
+        "selectedIconPath": "assets/tabbar/mine_active.png"
       }
     ]
   },

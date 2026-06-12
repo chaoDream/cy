@@ -74,6 +74,7 @@ services:
       AI_API_KEY: ${AI_API_KEY:-}
       AI_MODEL_HIGH: ${AI_MODEL_HIGH:-deepseek-v4-flash}
       AI_MODEL_FAST: ${AI_MODEL_FAST:-deepseek-v4-flash}
+      PRICE_SEED_ENABLED: ${PRICE_SEED_ENABLED:-false}
       AVATAR_STORAGE_DIR: /data/avatars
       PRODUCT_IMAGE_STORAGE_DIR: /data/product-images
     networks:

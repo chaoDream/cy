@@ -83,7 +83,7 @@ class AnalysisService(
         val priced = ensureJdPricedItem(enriched, linkText)
 
         // 非手机品类：mock 演示数据严格拦截；真实联盟数据放行
-        val parsed = skuService.parseTitle(priced.title)
+        val parsed = skuService.parseItem(priced)
         if (affiliateProps.mock && parsed.brand == null && !looksLikePhone(priced.title)) {
             throw BizException(ErrorCode.NOT_PHONE_CATEGORY, "该商品暂不在手机品类范围内")
         }
