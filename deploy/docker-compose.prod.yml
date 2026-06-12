@@ -49,6 +49,8 @@ services:
     volumes:
       - avatar_data:/data/avatars
       - product_image_data:/data/product-images
+      # 40 款种子采价清单（宿主机维护，改完重启 backend 生效）
+      - ../backend/price-seeds.yml:/app/price-seeds.yml:ro
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-zdsj}
@@ -61,6 +63,20 @@ services:
       WX_SECRET: ${WX_SECRET:-}
       WX_SUB_TEMPLATE: ${WX_SUB_TEMPLATE:-}
       AFFILIATE_MOCK: ${AFFILIATE_MOCK:-false}
+      JD_PROVIDER_PRIMARY: ${JD_PROVIDER_PRIMARY:-jd_official}
+      JD_PROVIDER_FALLBACK: ${JD_PROVIDER_FALLBACK:-mock}
+      JD_PROVIDER_AUTO_FAILOVER: ${JD_PROVIDER_AUTO_FAILOVER:-true}
+      PDD_PROVIDER_PRIMARY: ${PDD_PROVIDER_PRIMARY:-pdd_official}
+      PDD_PROVIDER_FALLBACK: ${PDD_PROVIDER_FALLBACK:-mock}
+      PDD_PROVIDER_AUTO_FAILOVER: ${PDD_PROVIDER_AUTO_FAILOVER:-true}
+      VEAPI_BASE_URL: ${VEAPI_BASE_URL:-http://api.veapi.cn}
+      VEAPI_VEKEY: ${VEAPI_VEKEY:-}
+      VEAPI_SECRET: ${VEAPI_SECRET:-}
+      VEAPI_JD_SESSIONKEY: ${VEAPI_JD_SESSIONKEY:-}
+      VEAPI_JD_UNION_ID: ${VEAPI_JD_UNION_ID:-}
+      VEAPI_JD_POSITION_ID: ${VEAPI_JD_POSITION_ID:-}
+      VEAPI_PDD_SESSIONKEY: ${VEAPI_PDD_SESSIONKEY:-}
+      VEAPI_PDD_PID: ${VEAPI_PDD_PID:-}
       PDD_CLIENT_ID: ${PDD_CLIENT_ID:-}
       PDD_CLIENT_SECRET: ${PDD_CLIENT_SECRET:-}
       PDD_PID: ${PDD_PID:-}
