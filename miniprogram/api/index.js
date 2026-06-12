@@ -57,6 +57,9 @@ module.exports = {
   getProfile: () => request({ url: '/api/user/profile' }),
   saveAssets: (assets) => request({ url: '/api/user/assets', method: 'POST', data: assets }),
 
+  // 推荐
+  recommend: () => request({ url: '/api/product/recommend', auth: false }),
+
   // 反馈（PRD §11.5）
   feedback: (data) => request({ url: '/api/feedback/create', method: 'POST', data }),
 };

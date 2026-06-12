@@ -106,9 +106,9 @@ function buildProdView(res, platformText, shopTypeText, productTags) {
   const needConfirm = !!(res.skuInfo && res.skuInfo.needConfirm);
   let skuWarning = '';
   if (needConfirm) {
-    skuWarning = '疑似同款，型号匹配置信度较低，切换店铺前请仔细核对规格';
+    skuWarning = '型号识别不确定，比价前请核对配置';
   } else if (confidence === 'mid') {
-    skuWarning = '型号匹配置信度中等，建议核对规格后再购买';
+    skuWarning = '建议核对商品配置后再购买';
   }
   return {
     isSelfShop,
@@ -143,6 +143,7 @@ Page({
     skuWarning: '',
     titleOverflow: false,
     titleModal: { show: false },
+    priceSavedText: '',
     // 国补定位弹窗
     locModal: { show: false },
     regionPicker: { show: false },
@@ -177,6 +178,7 @@ Page({
       aiError: '',
       titleOverflow: false,
       titleModal: { show: false },
+      priceSavedText: '',
     });
     this._loadAi(platform, itemId, assets);
     api
@@ -192,9 +194,12 @@ Page({
           price: yuan(c.estimatedFinalPrice),
         }));
         const sameItemBuyable = !!res.cpsLink;
+        let priceSavedText = '';
         if (res.priceInfo && !res.priceInfo.pricePending) {
           res.priceInfo.finalPriceText = yuan(res.priceInfo.estimatedFinalPrice);
           res.priceInfo.displayPriceText = yuan(res.priceInfo.displayPrice);
+          const saved = Number(res.priceInfo.displayPrice) - Number(res.priceInfo.estimatedFinalPrice);
+          if (saved > 0.01) priceSavedText = yuanTrim(saved);
         } else if (res.priceInfo) {
           res.priceInfo.finalPriceText = null;
           res.priceInfo.displayPriceText = null;
@@ -237,6 +242,7 @@ Page({
           crossView,
           sameItemBuyable,
           shopAlt,
+          priceSavedText,
           ...prodView,
         });
         track.event('analysis_view', {

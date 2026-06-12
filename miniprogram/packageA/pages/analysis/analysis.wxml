@@ -35,6 +35,21 @@
             wx:key="text"
           >{{item.text}}</text>
         </view>
+        <view class="prod-price {{data.priceInfo.pricePending ? 'prod-price-pending' : ''}}">
+          <view class="prod-price-left">
+            <text class="prod-price-label">参考到手价</text>
+            <view wx:if="{{!data.priceInfo.pricePending}}" class="prod-price-main">
+              <text class="prod-price-symbol">¥</text>
+              <text class="prod-price-num">{{data.priceInfo.finalPriceText}}</text>
+            </view>
+            <text wx:else class="prod-price-wait">获取中…</text>
+          </view>
+          <view class="prod-price-right" wx:if="{{!data.priceInfo.pricePending}}">
+            <text wx:if="{{priceSavedText}}" class="prod-price-save">省 ¥{{priceSavedText}}</text>
+            <text class="prod-price-origin">¥{{data.priceInfo.displayPriceText}}</text>
+          </view>
+          <text wx:else class="prod-price-hint">联盟暂未返回价格</text>
+        </view>
       </view>
     </view>
     <view wx:if="{{showStandardName}}" class="prod-sku">
@@ -42,7 +57,7 @@
       <text class="prod-sku-name">{{data.skuInfo.standardName}}</text>
     </view>
     <view wx:if="{{skuWarning}}" class="prod-alert">
-      <text class="prod-alert-icon">!</text>
+      <text class="prod-alert-icon">⚠</text>
       <text class="prod-alert-text">{{skuWarning}}</text>
     </view>
   </view>
@@ -84,17 +99,6 @@
       error="{{aiError}}"
       bind:retry="onRetryAi"
     />
-  </view>
-
-  <!-- 3. 当前参考到手价 -->
-  <view class="card price-card">
-    <text class="card-title">当前参考到手价</text>
-    <view class="price-row">
-      <text class="price-big" wx:if="{{!data.priceInfo.pricePending}}">¥{{data.priceInfo.finalPriceText}}</text>
-      <text class="price-big muted" wx:else>待获取</text>
-      <text class="price-origin" wx:if="{{!data.priceInfo.pricePending}}">展示价 ¥{{data.priceInfo.displayPriceText}}</text>
-      <text class="price-origin muted" wx:else>联盟暂未返回价格，请重新粘贴链接或稍后重试</text>
-    </view>
   </view>
 
   <!-- 4. 价格脱水路径（瀑布流） -->
