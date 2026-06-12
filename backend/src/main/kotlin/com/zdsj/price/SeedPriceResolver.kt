@@ -4,6 +4,8 @@ import com.zdsj.affiliate.AffiliateItem
 import com.zdsj.affiliate.JdSearchRemedy
 import com.zdsj.affiliate.Platform
 import com.zdsj.affiliate.provider.AffiliateGateway
+import com.zdsj.affiliate.provider.AffiliateResult
+import com.zdsj.config.AffiliateProperties
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -16,6 +18,7 @@ import java.time.OffsetDateTime
 class SeedPriceResolver(
     private val gateway: AffiliateGateway,
     private val bindingRepo: PriceSeedBindingRepository,
+    private val affiliateProps: AffiliateProperties,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -34,13 +37,14 @@ class SeedPriceResolver(
         // 故 hash 绑定直接跳过快路重新搜索；并要求查到的商品有价，避免 mock 兜底的 0 价短路。
         if (binding != null && binding.platformItemId.all { it.isDigit() }) {
             val cached = gateway.fetchItem(platform, binding.platformItemId, bypassCache = true).data
-            if (cached != null && JdSearchRemedy.hasPrice(cached)) return cached
+            if (cached != null && JdSearchRemedy.hasPrice(cached) && !isMockItem(cached)) return cached
             log.info("种子绑定失效，重新搜索 seed={} platform={} oldItemId={}", key, platform.code, binding.platformItemId)
         }
 
         val keyword = key
-        val candidates = gateway.search(platform, keyword, searchLimit).data
-            ?: emptyList()
+        val searchResult = gateway.search(platform, keyword, searchLimit)
+        rejectMockSource(searchResult, platform)
+        val candidates = searchResult.data?.filter { JdSearchRemedy.hasPrice(it) && !isMockItem(it) } ?: emptyList()
         if (candidates.isEmpty()) {
             throw IllegalStateException("搜索无结果: $keyword (${platform.code})")
         }
@@ -68,6 +72,26 @@ class SeedPriceResolver(
             b.updatedAt = OffsetDateTime.now()
             bindingRepo.save(b)
         }
+    }
+
+    /** 生产关闭 mock 时拒绝 mock 数据源（降级链兜底或历史假绑定）。 */
+    private fun rejectMockSource(result: AffiliateResult<List<AffiliateItem>>, platform: Platform) {
+        if (affiliateProps.mock) return
+        if (result.source == "mock") {
+            throw IllegalStateException("联盟 ${platform.code} 仅允许真实数据（mock 已禁用）")
+        }
+    }
+
+    /** MockCatalog 生成的 itemId 形如 jd_iphone16pro / pdd_mate70pro，与真实 SKU / goodsSign 区分。 */
+    internal fun isMockItem(item: AffiliateItem): Boolean {
+        if (affiliateProps.mock) return false
+        val id = item.platformItemId
+        val suffix = when {
+            id.startsWith("jd_") -> id.removePrefix("jd_")
+            id.startsWith("pdd_") -> id.removePrefix("pdd_")
+            else -> return item.title.startsWith("Mock商品")
+        }
+        return suffix.isNotEmpty() && !suffix.all { it.isDigit() }
     }
 
     /** 标题匹配分 + 自营/旗舰店优先 */
