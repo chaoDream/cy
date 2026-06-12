@@ -1,5 +1,6 @@
 {
   "navigationBarTitleText": "商品分析",
+  "requiredPrivateInfos": ["getFuzzyLocation"],
   "usingComponents": {
     "ai-conclusion": "/components/ai-conclusion/ai-conclusion",
     "price-waterfall": "/components/price-waterfall/price-waterfall",

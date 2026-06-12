@@ -61,7 +61,7 @@
   },
   "__usePrivacyCheck__": true,
   "permission": {
-    "scope.userLocation": {
+    "scope.userFuzzyLocation": {
       "desc": "用于推荐你所在地区的国补政策"
     }
   },

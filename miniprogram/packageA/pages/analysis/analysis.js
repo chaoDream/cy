@@ -18,6 +18,55 @@ const { copyPurchaseLink } = require('../../../utils/purchase');
 
 const app = getApp();
 
+const PROVINCES = ['北京市', '上海市', '天津市', '重庆市', '广东省', '江苏省', '浙江省', '四川省', '湖北省', '山东省', '河南省', '福建省', '湖南省', '安徽省', '河北省', '陕西省', '辽宁省', '江西省', '广西壮族自治区', '云南省', '贵州省', '山西省', '吉林省', '黑龙江省', '甘肃省', '内蒙古自治区', '新疆维吾尔自治区', '海南省', '宁夏回族自治区', '青海省', '西藏自治区'];
+const GOV_LOCATION_DENY_KEY = 'gov_location_deny_ts';
+const GOV_DENY_COOLDOWN = 7 * 24 * 60 * 60 * 1000;
+
+// 省会城市经纬度（用于根据定位匹配最近省份）
+const PROVINCE_COORDS = [
+  { name: '北京市', lat: 39.9042, lng: 116.4074 },
+  { name: '上海市', lat: 31.2304, lng: 121.4737 },
+  { name: '天津市', lat: 39.0842, lng: 117.2009 },
+  { name: '重庆市', lat: 29.5630, lng: 106.5516 },
+  { name: '广东省', lat: 23.1291, lng: 113.2644 },
+  { name: '江苏省', lat: 32.0603, lng: 118.7969 },
+  { name: '浙江省', lat: 30.2741, lng: 120.1551 },
+  { name: '四川省', lat: 30.5728, lng: 104.0668 },
+  { name: '湖北省', lat: 30.5928, lng: 114.3055 },
+  { name: '山东省', lat: 36.6512, lng: 117.1201 },
+  { name: '河南省', lat: 34.7466, lng: 113.6254 },
+  { name: '福建省', lat: 26.0745, lng: 119.2965 },
+  { name: '湖南省', lat: 28.2282, lng: 112.9388 },
+  { name: '安徽省', lat: 31.8612, lng: 117.2830 },
+  { name: '河北省', lat: 38.0428, lng: 114.5149 },
+  { name: '陕西省', lat: 34.2658, lng: 108.9541 },
+  { name: '辽宁省', lat: 41.8057, lng: 123.4315 },
+  { name: '江西省', lat: 28.6820, lng: 115.8579 },
+  { name: '广西壮族自治区', lat: 22.8170, lng: 108.3665 },
+  { name: '云南省', lat: 25.0389, lng: 102.7183 },
+  { name: '贵州省', lat: 26.6470, lng: 106.6302 },
+  { name: '山西省', lat: 37.8706, lng: 112.5489 },
+  { name: '吉林省', lat: 43.8868, lng: 125.3245 },
+  { name: '黑龙江省', lat: 45.7500, lng: 126.6500 },
+  { name: '甘肃省', lat: 36.0611, lng: 103.8343 },
+  { name: '内蒙古自治区', lat: 40.8424, lng: 111.7500 },
+  { name: '新疆维吾尔自治区', lat: 43.7930, lng: 87.6271 },
+  { name: '海南省', lat: 20.0174, lng: 110.3493 },
+  { name: '宁夏回族自治区', lat: 38.4872, lng: 106.2309 },
+  { name: '青海省', lat: 36.6171, lng: 101.7782 },
+  { name: '西藏自治区', lat: 29.6500, lng: 91.1000 },
+];
+
+function nearestProvince(lat, lng) {
+  let best = PROVINCE_COORDS[0];
+  let minDist = Infinity;
+  for (const p of PROVINCE_COORDS) {
+    const d = (p.lat - lat) ** 2 + (p.lng - lng) ** 2;
+    if (d < minDist) { minDist = d; best = p; }
+  }
+  return best.name;
+}
+
 Page({
   data: {
     loading: true,
@@ -34,6 +83,11 @@ Page({
     aiRecommendation: null,
     aiError: '',
     watchModal: { show: false },
+    // 国补定位弹窗
+    locModal: { show: false },
+    regionPicker: { show: false },
+    provinces: PROVINCES,
+    regionIndex: 0,
   },
 
   onLoad(query) {
@@ -92,6 +146,7 @@ Page({
           platform: this.data.platform,
           is_price_compare: !sameItemBuyable,
         });
+        this._checkGovLocationPopup(productTags);
       }))
       .catch((err) => {
         this.setData({ loading: false, error: err.message || '加载失败' });
@@ -310,6 +365,67 @@ Page({
 
   _copyAndGuide(link, linkType, platform) {
     copyPurchaseLink(link, linkType, platform);
+  },
+
+  // ---- 国补定位弹窗 ----
+
+  _checkGovLocationPopup(productTags) {
+    const hasGov = productTags.some((t) => t.gov);
+    if (!hasGov) return;
+    const assets = app.getAssets();
+    if (assets.govSubsidyRegion) return;
+    const denyTs = wx.getStorageSync(GOV_LOCATION_DENY_KEY) || 0;
+    if (Date.now() - denyTs < GOV_DENY_COOLDOWN) return;
+    this.setData({ 'locModal.show': true });
+  },
+
+  onLocAllow() {
+    this.setData({ 'locModal.show': false });
+    wx.getFuzzyLocation({
+      type: 'wgs84',
+      success: (res) => {
+        this._resolveProvince(res.latitude, res.longitude);
+      },
+      fail: () => {
+        wx.showToast({ title: '获取位置失败，请手动选择', icon: 'none' });
+        this.setData({ 'regionPicker.show': true });
+      },
+    });
+  },
+
+  onLocDeny() {
+    this.setData({ 'locModal.show': false });
+    wx.setStorageSync(GOV_LOCATION_DENY_KEY, Date.now());
+  },
+
+  onLocManual() {
+    this.setData({ 'locModal.show': false, 'regionPicker.show': true });
+  },
+
+  onRegionChange(e) {
+    const idx = e.detail.value[0];
+    this.setData({ regionIndex: idx });
+  },
+
+  onRegionConfirm() {
+    const province = PROVINCES[this.data.regionIndex];
+    this.setData({ 'regionPicker.show': false });
+    this._saveRegionAndReload(province);
+  },
+
+  onCloseRegionPicker() {
+    this.setData({ 'regionPicker.show': false });
+  },
+
+  _resolveProvince(lat, lng) {
+    const province = nearestProvince(lat, lng);
+    this._saveRegionAndReload(province);
+  },
+
+  _saveRegionAndReload(province) {
+    app.setAssets({ govSubsidyRegion: province });
+    wx.showToast({ title: `已设置国补地区：${province}`, icon: 'none' });
+    this._load();
   },
 
   onFeedback() {

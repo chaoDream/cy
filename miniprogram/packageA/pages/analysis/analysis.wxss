@@ -234,3 +234,73 @@
   background: #d9dbe0;
   color: #fff;
 }
+
+/* ============ 国补定位弹窗 ============ */
+.loc-mask {
+  position: fixed;
+  left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.loc-panel {
+  width: 600rpx;
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 48rpx 40rpx 36rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.loc-icon { font-size: 72rpx; margin-bottom: 16rpx; }
+.loc-title { font-size: 34rpx; font-weight: 700; color: #1f2329; margin-bottom: 12rpx; }
+.loc-desc { font-size: 26rpx; color: #6b7280; text-align: center; line-height: 1.6; margin-bottom: 32rpx; }
+.loc-btn {
+  width: 100%;
+  height: 84rpx;
+  line-height: 84rpx;
+  border-radius: 44rpx;
+  font-size: 30rpx;
+  text-align: center;
+  margin-bottom: 16rpx;
+}
+.loc-btn-allow { background: #fa3534; color: #fff; }
+.loc-btn-deny { background: #f2f3f5; color: #6b7280; }
+.loc-manual { font-size: 26rpx; color: #1a73e8; margin-top: 8rpx; padding: 8rpx 0; }
+
+/* ============ 手动选择地区弹窗 ============ */
+.rp-panel {
+  width: 100%;
+  background: #fff;
+  border-radius: 28rpx 28rpx 0 0;
+  padding: 32rpx 32rpx calc(32rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  position: fixed;
+  left: 0; bottom: 0;
+  z-index: 1001;
+}
+.rp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+.rp-title { font-size: 32rpx; font-weight: 700; color: #1f2329; }
+.rp-close { font-size: 32rpx; color: #b0b4ba; padding: 0 10rpx; }
+.rp-picker { height: 400rpx; width: 100%; }
+.rp-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30rpx;
+  color: #1f2329;
+}
+.rp-confirm {
+  margin-top: 20rpx;
+  background: #fa3534;
+  color: #fff;
+  font-size: 30rpx;
+  border-radius: 44rpx;
+}

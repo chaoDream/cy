@@ -164,5 +164,33 @@
   </view>
 </view>
 
+<!-- 国补定位弹窗 -->
+<view wx:if="{{locModal.show}}" class="loc-mask">
+  <view class="loc-panel" catchtap="noop">
+    <view class="loc-icon">📍</view>
+    <text class="loc-title">开启定位享受国补优惠</text>
+    <text class="loc-desc">该商品支持国家补贴，开启位置信息后可自动计算您所在地区的国补金额</text>
+    <button class="loc-btn loc-btn-allow" catchtap="onLocAllow">允许获取位置</button>
+    <button class="loc-btn loc-btn-deny" catchtap="onLocDeny">拒绝</button>
+    <text class="loc-manual" catchtap="onLocManual">暂不开启，手动选择地区</text>
+  </view>
+</view>
+
+<!-- 手动选择地区弹窗 -->
+<view wx:if="{{regionPicker.show}}" class="loc-mask" bindtap="onCloseRegionPicker">
+  <view class="rp-panel" catchtap="noop">
+    <view class="rp-header">
+      <text class="rp-title">选择国补地区</text>
+      <text class="rp-close" catchtap="onCloseRegionPicker">✕</text>
+    </view>
+    <picker-view class="rp-picker" value="{{[regionIndex]}}" bindchange="onRegionChange">
+      <picker-view-column>
+        <view wx:for="{{provinces}}" wx:key="*this" class="rp-item">{{item}}</view>
+      </picker-view-column>
+    </picker-view>
+    <button class="rp-confirm" catchtap="onRegionConfirm">确认选择</button>
+  </view>
+</view>
+
 <privacy-popup></privacy-popup>
 </view>
