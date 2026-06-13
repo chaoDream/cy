@@ -131,6 +131,15 @@ zdsj:
     enabled: ${PRICE_SEED_ENABLED:false}
     poll-cron: "0 0 6 * * ?"           # 名称模式：每天 06:00 采价
     search-limit: 10
+    # 在静态 YAML 清单之上，按品牌产品线自动追加比现有种子更新的机型
+    auto-latest:
+      enabled: ${PRICE_SEED_AUTO_LATEST:true}
+      max-per-brand: 2                  # 每品牌最多追加 2 条
+      max-total: 15                     # 动态追加总数上限（见下方说明，可改大）
+      platform: jd
+      search-limit: 15
+      cache-hours: 24
+      refresh-cron: "0 55 5 * * ?"    # 每天 05:55 自动刷新，早于采价 06:00
     items:
       - name: "iPhone 16 Pro 256GB 国行"
         platforms: [jd, pdd]

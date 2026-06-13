@@ -30,13 +30,13 @@
     <product-card wx:for="{{searchResults}}" wx:key="itemId" item="{{item}}" bind:tap="onCardTap" />
   </view>
 
-  <!-- 最近查询 -->
-  <view class="section">
+  <!-- 最近查询（有记录时才显示） -->
+  <view class="section" wx:if="{{recentVisible.length}}">
     <view class="section-header">
       <text class="section-title">最近查询</text>
       <text wx:if="{{recentHasMore}}" class="section-more" bindtap="onShowRecentPopup">更多 ›</text>
     </view>
-    <view wx:if="{{recentVisible.length}}" class="recent-list">
+    <view class="recent-list">
       <view
         class="recent-row"
         wx:for="{{recentVisible}}"
@@ -64,7 +64,6 @@
         </view>
       </view>
     </view>
-    <view wx:else class="empty">还没有查询记录，粘贴一个链接试试吧</view>
   </view>
 
   <!-- 好价推荐 -->

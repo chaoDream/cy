@@ -14,7 +14,7 @@ import java.time.OffsetDateTime
 
 /**
  * 按商品名称在指定平台搜索并绑定稳定 itemId，供定时采价复用。
- * 京东：搜索命中后自动 getNumid 转成数字 SKU 写入 binding，后续走批量 promotiongoodsinfo。
+ * 京东：搜索命中后尝试 getNumid / URL 跳转 / getidfromlink 转数字 SKU；失败则保留 hash。
  */
 @Service
 class SeedPriceResolver(
@@ -114,15 +114,15 @@ class SeedPriceResolver(
 
     /** 搜索命中后归一化为 binding ID（数字 SKU 优先，getNumid 失败则保留 hash / goods_sign） */
     private fun normalizeForBinding(platform: Platform, item: AffiliateItem): AffiliateItem {
-        val stableId = toDirectPollId(platform, item.platformItemId) ?: item.platformItemId
+        val stableId = toDirectPollId(platform, item.platformItemId, item.sourceUrl) ?: item.platformItemId
         return item.copy(platformItemId = stableId)
     }
 
     /** 转为批量直查 ID：京东数字 SKU / 拼多多 goods_sign */
-    internal fun toDirectPollId(platform: Platform, itemId: String): String? = when (platform) {
+    internal fun toDirectPollId(platform: Platform, itemId: String, hintUrl: String? = null): String? = when (platform) {
         Platform.JD -> when {
             itemId.all { it.isDigit() } -> itemId
-            else -> gateway.resolveNumericItemId(platform, itemId)
+            else -> gateway.resolveNumericItemId(platform, itemId, hintUrl)
         }
         Platform.PDD -> itemId.takeIf { PddLinkParser.isGoodsSign(it) }
         else -> null

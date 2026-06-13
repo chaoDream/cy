@@ -4,6 +4,7 @@ import com.zdsj.common.ApiResponse
 import com.zdsj.config.CatalogSyncProperties
 import com.zdsj.config.PriceSeedProperties
 import com.zdsj.catalog.CatalogSyncJob
+import com.zdsj.price.DynamicSeedComposer
 import com.zdsj.price.SeedPricePollingJob
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.ObjectProvider
@@ -30,6 +31,7 @@ class AdminOverviewController(
     private val catalogSyncProps: CatalogSyncProperties,
     /** 采价任务是条件化 Bean（zdsj.price-seed.enabled=true 才存在），用 Provider 可选注入。 */
     private val pollingJob: ObjectProvider<SeedPricePollingJob>,
+    private val seedComposer: ObjectProvider<DynamicSeedComposer>,
     private val catalogSyncJob: ObjectProvider<CatalogSyncJob>,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -79,8 +81,22 @@ class AdminOverviewController(
         )
     }
 
+    /** 刷新动态最新机型种子（不采价，仅更新内存清单） */
+    @PostMapping("/price-seed/refresh-dynamic")
+    fun refreshDynamicSeeds(): ApiResponse<Map<String, Any?>> {
+        val composer = seedComposer.ifAvailable
+            ?: return ApiResponse.fail(4003, "采价未启用")
+        val dynamic = composer.refreshNow()
+        return ApiResponse.ok(
+            mapOf(
+                "staticCount" to composer.staticCount(),
+                "dynamicCount" to dynamic.size,
+                "dynamicSeeds" to dynamic.map { mapOf("name" to it.name, "note" to it.note, "platforms" to it.platforms) },
+            ),
+        )
+    }
+
     /**
-     * 手动立即同步品牌型号目录（测试 / 补采）。
      * 需 zdsj.catalog-sync.enabled=true。
      */
     @PostMapping("/catalog-sync/run")
@@ -178,11 +194,20 @@ class AdminOverviewController(
 
     /** 种子采价配置快照（是否启用 / cron / 商品数）。 */
     private fun priceSeedConfig(): Map<String, Any?> {
-        val items = runCatching { seedProps.enabledItems().filter { it.isNameMode() } }.getOrDefault(emptyList())
+        val static = runCatching { seedProps.enabledItems().filter { it.isNameMode() } }.getOrDefault(emptyList())
+        val composer = seedComposer.ifAvailable
         return mapOf(
             "enabled" to seedProps.enabled,
             "pollCron" to seedProps.pollCron,
-            "enabledItemCount" to items.size,
+            "staticItemCount" to static.size,
+            "dynamicItemCount" to composer?.dynamicCount(),
+            "effectiveItemCount" to (composer?.let { it.staticCount() + it.dynamicCount() } ?: static.size),
+            "autoLatest" to mapOf(
+                "enabled" to seedProps.autoLatest.enabled,
+                "maxPerBrand" to seedProps.autoLatest.maxPerBrand,
+                "maxTotal" to seedProps.autoLatest.maxTotal,
+            ),
+            "dynamicSeeds" to composer?.dynamicItems()?.map { it.name },
         )
     }
 

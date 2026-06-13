@@ -139,6 +139,9 @@ class JdUnionClient(
             JdLinkParser.extractItemIdFromUrl(finalUrl)?.let { return it }
 
             val body = response.body() ?: ""
+            // 联盟详情页 HTML 内嵌 item.jd.com 链接
+            Regex("""item\.jd\.com/(\d+)\.html""", RegexOption.IGNORE_CASE)
+                .find(body)?.groupValues?.get(1)?.let { return it }
             Regex("""hrl='([^']+)'""").find(body)?.groupValues?.get(1)?.let { hrl ->
                 resolveSkuIdFromUrl(hrl)?.let { return it }
             }

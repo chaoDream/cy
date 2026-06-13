@@ -26,6 +26,14 @@ zdsj:
   price-seed:
     enabled: true
     poll-cron: "0 0 6 * * ?"    # 每天 06:00；测试可改成 "0 */5 * * * ?" 每 5 分钟
+    # 动态最新机型：在下方 40 条静态种子基础上，按产品线追加更新型号（不删旧款）
+    auto-latest:
+      enabled: true
+      max-per-brand: 2
+      max-total: 15                     # 防 API 爆量；40 静态 + 15 动态 ≈ 55 条采价任务
+      platform: jd
+      cache-hours: 24
+      refresh-cron: "0 55 5 * * ?"    # 每天自动刷新，无需手点 API
     items:
       # 苹果 (Apple) - 6款
       - name: "iPhone 16 Pro Max 256GB 国行"

@@ -1,6 +1,7 @@
 package com.zdsj.affiliate.provider
 
 import com.zdsj.affiliate.AffiliateItem
+import com.zdsj.affiliate.jd.JdNumericSkuResolver
 import com.zdsj.affiliate.Platform
 import com.zdsj.config.AffiliateProperties
 import org.slf4j.LoggerFactory
@@ -17,6 +18,7 @@ class AffiliateGateway(
     private val cache: AffiliateCache,
     private val breaker: ProviderCircuitBreaker,
     private val metrics: AffiliateMetrics,
+    private val jdNumericSkuResolver: JdNumericSkuResolver,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
     private val byName = providers.associateBy { it.name() }
@@ -151,9 +153,12 @@ class AffiliateGateway(
         return null
     }
 
-    /** 联盟字符串 ID → 京东数字 SKU（维易 getNumid）；失败返回 null */
-    fun resolveNumericItemId(platform: Platform, itemId: String): String? {
+    /** 联盟字符串 ID → 京东数字 SKU；hintUrl 为搜索 materialUrl，用于跳转解析 */
+    fun resolveNumericItemId(platform: Platform, itemId: String, hintUrl: String? = null): String? {
         if (itemId.all { it.isDigit() }) return itemId
+        if (platform == Platform.JD) {
+            jdNumericSkuResolver.resolve(itemId, hintUrl)?.let { return it }
+        }
         val ctx = contextFor(platform, bypassCache = true)
         val order = providerOrder(platform)
         for (name in order) {

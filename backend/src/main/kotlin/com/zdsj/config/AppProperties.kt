@@ -165,7 +165,24 @@ data class PriceSeedProperties(
     /** 拼多多批量 goods_sign_list 每批数量 */
     val pddBatchSize: Int = 20,
     val items: List<SeedItem> = emptyList(),
+    /** 在静态 YAML 基础上，按品牌产品线自动追加比现有种子更新的机型 */
+    val autoLatest: AutoLatest = AutoLatest(),
 ) {
+    data class AutoLatest(
+        val enabled: Boolean = false,
+        /** 每个品牌最多追加几条动态种子 */
+        val maxPerBrand: Int = 2,
+        /** 动态种子总数上限（叠加在 40 条静态之后） */
+        val maxTotal: Int = 15,
+        /** 发现最新机型时的搜索平台 */
+        val platform: String = "jd",
+        val searchLimit: Int = 15,
+        /** 动态列表缓存小时数，避免同一天内重复搜索 */
+        val cacheHours: Int = 24,
+        /** 自动刷新 cron（默认每天 05:55，早于采价 06:00） */
+        val refreshCron: String = "0 55 5 * * ?",
+    )
+
     data class SeedItem(
         /** 商品名称/搜索词（推荐）：自动在京东+拼多多搜索 */
         val name: String = "",

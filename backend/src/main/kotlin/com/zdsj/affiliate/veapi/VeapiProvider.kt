@@ -7,6 +7,7 @@ import com.zdsj.affiliate.JdLinkParser
 import com.zdsj.affiliate.JdSearchRemedy
 import com.zdsj.affiliate.PddLinkParser
 import com.zdsj.affiliate.Platform
+import com.zdsj.affiliate.jd.JdNumericSkuResolver
 import com.zdsj.affiliate.jd.JdUnionClient
 import com.zdsj.affiliate.provider.AffiliateContext
 import com.zdsj.affiliate.provider.AffiliateProvider
@@ -25,6 +26,7 @@ class VeapiProvider(
     private val mapper: VeapiMapper,
     private val props: AffiliateProperties,
     private val jdUnionClient: JdUnionClient,
+    private val jdNumericSkuResolver: JdNumericSkuResolver,
 ) : AffiliateProvider {
 
     private val veapi get() = props.veapi
@@ -145,27 +147,19 @@ class VeapiProvider(
     }
 
     override fun resolveNumericItemId(ctx: AffiliateContext, itemId: String): String? = when (ctx.platform) {
-        Platform.JD -> when {
-            itemId.all(Char::isDigit) -> itemId
-            else -> resolveJdNumericSkuId(itemId)
-        }
+        Platform.JD -> jdNumericSkuResolver.resolve(itemId)
         else -> itemId.takeIf { it.all(Char::isDigit) }
     }
 
     // ---- JD ----
-
-    /** 维易 /jd/getNumid：联盟字符串 ID → 京东数字 skuId */
-    private fun resolveJdNumericSkuId(strId: String): String? {
-        val data = client.get("/jd/getNumid", mapOf("strid" to strId)) ?: return null
-        return data.path("skuid").asText(null)?.takeIf { it.isNotBlank() && it.all(Char::isDigit) }
-    }
 
     /**
      * 数字 SKU 查价：promotiongoodsinfo（官方常 403）→ jd_search 补救。
      * @param shareTitle 可选，用于搜索匹配与品牌+型号召回
      */
     private fun fetchJdItem(itemId: String, shareTitle: String? = null): AffiliateItem? {
-        val numericSku = itemId.takeIf { it.all(Char::isDigit) } ?: resolveJdNumericSkuId(itemId)
+        val numericSku = itemId.takeIf { it.all(Char::isDigit) }
+            ?: jdNumericSkuResolver.resolve(itemId)
         if (numericSku != null) {
             val fromPromo = client.get("/jd/promotiongoodsinfo", mapOf("skuIds" to numericSku))
                 ?.let { listNodes(it).firstNotNullOfOrNull { node -> mapper.mapJdPromotionGoods(node) } }

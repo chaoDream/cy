@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional
 @ConditionalOnProperty(prefix = "zdsj.price-seed", name = ["enabled"], havingValue = "true")
 class SeedPricePollingJob(
     private val seedProps: PriceSeedProperties,
+    private val seedComposer: DynamicSeedComposer,
     private val resolver: SeedPriceResolver,
     private val bindingRepo: PriceSeedBindingRepository,
     private val gateway: AffiliateGateway,
@@ -36,13 +37,17 @@ class SeedPricePollingJob(
 
     @PostConstruct
     fun logStartup() {
-        val items = seedProps.enabledItems()
-        log.info("种子采价已启用：共 {} 个商品，cron={}", items.size, seedProps.pollCron)
+        log.info(
+            "种子采价已启用：静态 {} 条，auto-latest={} cron={}",
+            seedComposer.staticCount(),
+            seedProps.autoLatest.enabled,
+            seedProps.pollCron,
+        )
     }
 
     @Scheduled(cron = "\${zdsj.price-seed.poll-cron}")
     fun pollDaily() {
-        if (seedProps.enabledItems().isEmpty()) return
+        if (seedComposer.effectiveItems().isEmpty()) return
         val r = runOnce("每日")
         log.info(
             "种子采价[每日] 完成 共{} 成功{} 失败{} 批量{} 搜索{} 耗时{}ms",
@@ -52,8 +57,11 @@ class SeedPricePollingJob(
 
     fun runOnce(trigger: String = "手动"): SeedPollResult {
         val started = System.currentTimeMillis()
-        val items = seedProps.enabledItems()
-        log.info("种子采价[{}] 开始 共 {} 个商品", trigger, items.size)
+        val items = seedComposer.effectiveItems()
+        log.info(
+            "种子采价[{}] 开始 静态{} 动态{} 合计{}",
+            trigger, seedComposer.staticCount(), items.size - seedComposer.staticCount(), items.size,
+        )
         var success = 0
         var failed = 0
         var batchCount = 0

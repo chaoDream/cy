@@ -3,9 +3,11 @@ package com.zdsj.catalog
 import com.zdsj.affiliate.Platform
 import com.zdsj.affiliate.provider.AffiliateGateway
 import com.zdsj.config.CatalogSyncProperties
+import com.zdsj.price.DynamicSeedComposer
 import com.zdsj.sku.SkuCatalogReader
 import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -20,6 +22,7 @@ class CatalogSyncJob(
     private val gateway: AffiliateGateway,
     private val harvestService: CatalogHarvestService,
     private val catalogReader: SkuCatalogReader,
+    private val seedComposer: ObjectProvider<DynamicSeedComposer>,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -73,6 +76,7 @@ class CatalogSyncJob(
         }
 
         catalogReader.refresh()
+        seedComposer.ifAvailable?.invalidateCache()
         return CatalogSyncResult(
             keywordCount = keywords.size,
             itemCount = itemCount,

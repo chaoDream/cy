@@ -1,6 +1,7 @@
 package com.zdsj.affiliate.provider
 
 import com.zdsj.affiliate.AffiliateItem
+import com.zdsj.affiliate.jd.JdNumericSkuResolver
 import com.zdsj.affiliate.Platform
 import com.zdsj.config.AffiliateProperties
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -47,9 +48,11 @@ class AffiliateGatewayTest {
         override fun buildCpsLink(ctx: AffiliateContext, itemId: String): String? = null
     }
 
+    private val jdNumericSkuResolver: JdNumericSkuResolver = Mockito.mock(JdNumericSkuResolver::class.java)
+
     private fun gateway(providers: List<AffiliateProvider>, jdRoute: AffiliateProperties.PlatformRoute): AffiliateGateway {
         val props = AffiliateProperties(provider = AffiliateProperties.ProviderRouting(jd = jdRoute))
-        return AffiliateGateway(providers, props, cache, breaker, metrics)
+        return AffiliateGateway(providers, props, cache, breaker, metrics, jdNumericSkuResolver)
     }
 
     @Test
