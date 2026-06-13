@@ -1,5 +1,6 @@
 package com.zdsj.product
 
+import com.zdsj.affiliate.ActivityTags
 import com.zdsj.affiliate.AffiliateItem
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -27,7 +28,7 @@ class ProductIngestService(
         entity.shopType = item.shopType
         entity.rawPrice = item.rawPrice
         entity.couponInfo = item.couponInfo.toMutableMap()
-        entity.activityTags = item.activityTags.toMutableList()
+        entity.activityTags = ActivityTags.sanitize(item.activityTags).toMutableList()
         entity.sourceUrl = item.sourceUrl
         entity.updatedAt = OffsetDateTime.now()
         val saved = rawRepo.save(entity)
@@ -46,7 +47,7 @@ class ProductIngestService(
         couponInfo = raw.couponInfo,
         subsidyAmount = (raw.couponInfo["subsidy"] as? Number)?.let { BigDecimal(it.toString()) } ?: BigDecimal.ZERO,
         freight = BigDecimal.ZERO,
-        activityTags = raw.activityTags,
+        activityTags = ActivityTags.sanitize(raw.activityTags),
         sourceUrl = raw.sourceUrl,
     )
 }

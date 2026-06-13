@@ -1,6 +1,7 @@
 package com.zdsj.affiliate.pdd
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.zdsj.affiliate.ActivityTags
 import com.zdsj.affiliate.AffiliateItem
 import com.zdsj.affiliate.PddLinkParser
 import com.zdsj.affiliate.Platform
@@ -41,7 +42,7 @@ class PddDdkService(
                 couponInfo = emptyMap(),
                 subsidyAmount = BigDecimal.ZERO,
                 freight = BigDecimal.ZERO,
-                activityTags = listOf("多多进宝"),
+                activityTags = emptyList(),
                 sourceUrl = PddLinkParser.extractUrl(sourceLink.orEmpty()),
             )
         }
@@ -201,7 +202,7 @@ class PddDdkService(
             couponInfo = mapOf("platformCoupon" to coupon, "shopCoupon" to BigDecimal.ZERO),
             subsidyAmount = estimateSubsidy(node, rawPrice),
             freight = BigDecimal.ZERO,
-            activityTags = tags.ifEmpty { listOf("多多进宝") },
+            activityTags = ActivityTags.sanitize(tags),
             sourceUrl = node.path("goods_url").asText(null),
         )
     }

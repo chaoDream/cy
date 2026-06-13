@@ -495,7 +495,7 @@ class AnalysisService(
         "shopName" to item.shopName,
         "shopType" to item.shopType,
         "rawPrice" to item.rawPrice.takeIf { it > BigDecimal.ZERO },
-        "activityTags" to item.activityTags,
+        "activityTags" to com.zdsj.affiliate.ActivityTags.sanitize(item.activityTags),
         "sourceUrl" to item.sourceUrl,
     )
 }

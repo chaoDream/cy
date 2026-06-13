@@ -1,6 +1,7 @@
 package com.zdsj.affiliate.veapi
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.zdsj.affiliate.ActivityTags
 import com.zdsj.affiliate.AffiliateItem
 import com.zdsj.affiliate.Platform
 import com.zdsj.affiliate.jd.JdPriceMath
@@ -40,7 +41,7 @@ class VeapiMapper {
             shopType = shopType,
             rawPrice = price,
             sourceUrl = node.path("materialUrl").asText(null),
-            tags = buildList { if (shopType == "self") add("京东自营"); add("维易·京东联盟") },
+            tags = buildList { if (shopType == "self") add("京东自营") },
             context = "jd_promotiongoodsinfo",
             platformBrand = meta.brandName,
             platformSpuId = meta.spuId,
@@ -142,7 +143,6 @@ class VeapiMapper {
             tags = buildList {
                 if (node.path("activity_tags").any { it.asInt() == 7 }) add("百亿补贴")
                 if (coupon > BigDecimal.ZERO) add("券${coupon.plain()}元")
-                if (isEmpty()) add("多多进宝")
             },
             context = "pdd_goodssearch",
         )
@@ -180,7 +180,7 @@ class VeapiMapper {
             couponInfo = couponInfo ?: mapOf("platformCoupon" to coupon, "shopCoupon" to BigDecimal.ZERO),
             subsidyAmount = BigDecimal.ZERO,
             freight = BigDecimal.ZERO,
-            activityTags = tags.ifEmpty { listOf("维易") },
+            activityTags = ActivityTags.sanitize(tags),
             sourceUrl = sourceUrl,
             platformBrand = platformBrand,
             platformSpuId = platformSpuId,

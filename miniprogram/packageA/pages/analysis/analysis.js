@@ -81,7 +81,9 @@ function isSimilarText(a, b) {
   return overlap / tokensB.length >= 0.65;
 }
 
-/** 过滤与平台/店铺类型重复的活动标签 */
+const { sanitizeActivityTags, INTERNAL_ACTIVITY_TAGS } = require('../../../utils/activityTags');
+
+/** 过滤与平台/店铺重复的活动标签 */
 function dedupeProductTags(platformText, shopTypeText, productTags) {
   const redundant = new Set([
     platformText,
@@ -91,6 +93,7 @@ function dedupeProductTags(platformText, shopTypeText, productTags) {
     `${platformText}自营`,
     '京东自营',
     '拼多多官方',
+    ...INTERNAL_ACTIVITY_TAGS,
   ].filter(Boolean));
   return productTags.filter((t) => !redundant.has(t.text));
 }
@@ -214,7 +217,7 @@ Page(track.mergePage({
           res.priceInfo.finalPriceText = null;
           res.priceInfo.displayPriceText = null;
         }
-        const productTags = (res.productInfo.activityTags || []).map((t) => ({
+        const productTags = sanitizeActivityTags(res.productInfo.activityTags || []).map((t) => ({
           text: t,
           gov: /国补/.test(t),
         }));

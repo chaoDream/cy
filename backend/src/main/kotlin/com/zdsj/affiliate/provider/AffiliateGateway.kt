@@ -151,6 +151,20 @@ class AffiliateGateway(
         return null
     }
 
+    /** 联盟字符串 ID → 京东数字 SKU（维易 getNumid）；失败返回 null */
+    fun resolveNumericItemId(platform: Platform, itemId: String): String? {
+        if (itemId.all { it.isDigit() }) return itemId
+        val ctx = contextFor(platform, bypassCache = true)
+        val order = providerOrder(platform)
+        for (name in order) {
+            val provider = byName[name] ?: continue
+            if (!provider.supports(platform)) continue
+            val resolved = runCatching { provider.resolveNumericItemId(ctx, itemId) }.getOrNull()
+            if (!resolved.isNullOrBlank()) return resolved
+        }
+        return null
+    }
+
     /** 图片解析收口（供 ProductImageController 使用） */
     fun resolveImage(platform: Platform, itemId: String): String? =
         fetchItem(platform, itemId).data?.imageUrl?.takeIf { it.isNotBlank() }

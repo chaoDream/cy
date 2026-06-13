@@ -144,20 +144,41 @@ class VeapiProvider(
         Platform.PDD -> buildPddLink(ctx, itemId)
     }
 
+    override fun resolveNumericItemId(ctx: AffiliateContext, itemId: String): String? = when (ctx.platform) {
+        Platform.JD -> when {
+            itemId.all(Char::isDigit) -> itemId
+            else -> resolveJdNumericSkuId(itemId)
+        }
+        else -> itemId.takeIf { it.all(Char::isDigit) }
+    }
+
     // ---- JD ----
+
+    /** 维易 /jd/getNumid：联盟字符串 ID → 京东数字 skuId */
+    private fun resolveJdNumericSkuId(strId: String): String? {
+        val data = client.get("/jd/getNumid", mapOf("strid" to strId)) ?: return null
+        return data.path("skuid").asText(null)?.takeIf { it.isNotBlank() && it.all(Char::isDigit) }
+    }
 
     /**
      * 数字 SKU 查价：promotiongoodsinfo（官方常 403）→ jd_search 补救。
      * @param shareTitle 可选，用于搜索匹配与品牌+型号召回
      */
     private fun fetchJdItem(itemId: String, shareTitle: String? = null): AffiliateItem? {
-        if (!itemId.all { it.isDigit() }) return null
-
-        val fromPromo = client.get("/jd/promotiongoodsinfo", mapOf("skuIds" to itemId))
-            ?.let { listNodes(it).firstNotNullOfOrNull { node -> mapper.mapJdPromotionGoods(node) } }
-        if (fromPromo != null && JdSearchRemedy.hasPrice(fromPromo)) return fromPromo
-
-        return searchJdForSku(itemId, shareTitle) ?: fromPromo
+        val numericSku = itemId.takeIf { it.all(Char::isDigit) } ?: resolveJdNumericSkuId(itemId)
+        if (numericSku != null) {
+            val fromPromo = client.get("/jd/promotiongoodsinfo", mapOf("skuIds" to numericSku))
+                ?.let { listNodes(it).firstNotNullOfOrNull { node -> mapper.mapJdPromotionGoods(node) } }
+            if (fromPromo != null && JdSearchRemedy.hasPrice(fromPromo)) {
+                return fromPromo.copy(platformItemId = numericSku)
+            }
+            searchJdForSku(numericSku, shareTitle)?.let { return it.copy(platformItemId = numericSku) }
+            fromPromo?.let { return it.copy(platformItemId = numericSku) }
+        }
+        if (!shareTitle.isNullOrBlank()) {
+            searchByShareTitle(shareTitle, null)?.let { return it }
+        }
+        return null
     }
 
     /** promotiongoodsinfo 不可用时的 jd_search 补救 */

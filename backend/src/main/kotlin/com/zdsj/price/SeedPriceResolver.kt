@@ -2,6 +2,7 @@ package com.zdsj.price
 
 import com.zdsj.affiliate.AffiliateItem
 import com.zdsj.affiliate.JdSearchRemedy
+import com.zdsj.affiliate.PddLinkParser
 import com.zdsj.affiliate.Platform
 import com.zdsj.affiliate.provider.AffiliateGateway
 import com.zdsj.affiliate.provider.AffiliateResult
@@ -13,6 +14,7 @@ import java.time.OffsetDateTime
 
 /**
  * 按商品名称在指定平台搜索并绑定稳定 itemId，供定时采价复用。
+ * 京东：搜索命中后自动 getNumid 转成数字 SKU 写入 binding，后续走批量 promotiongoodsinfo。
  */
 @Service
 class SeedPriceResolver(
@@ -25,18 +27,16 @@ class SeedPriceResolver(
     fun normalizeSeedName(name: String): String = name.trim()
 
     /**
-     * 解析并返回联盟商品：优先用已绑定 ID；失效时多级关键词搜索 + 详情补价。
+     * 解析并返回联盟商品：优先用已绑定 ID；失效时多级关键词搜索 + 详情补价 + 自动数字 SKU。
      */
     @Transactional
     fun resolve(seedName: String, platform: Platform, searchLimit: Int = 10): AffiliateItem {
         val key = normalizeSeedName(seedName)
         val binding = bindingRepo.findBySeedNameAndPlatform(key, platform.code).orElse(null)
 
-        // 绑定快路：纯数字 SKU 可走 fetchItem（promotiongoodsinfo + jd_search 补救）
-        if (binding != null && binding.platformItemId.all { it.isDigit() }) {
-            val cached = refreshPrice(platform, binding.platformItemId)
-            if (cached != null && JdSearchRemedy.hasPrice(cached) && !isMockItem(cached)) return cached
-            log.info("种子绑定失效，重新搜索 seed={} platform={} oldItemId={}", key, platform.code, binding.platformItemId)
+        binding?.platformItemId?.let { boundId ->
+            tryReuseBinding(key, platform, boundId)?.let { return it }
+            log.info("种子绑定失效，重新搜索 seed={} platform={} oldItemId={}", key, platform.code, boundId)
         }
 
         val candidates = searchWithRecall(platform, key, searchLimit)
@@ -44,18 +44,40 @@ class SeedPriceResolver(
             throw IllegalStateException("搜索无结果: $key (${platform.code})")
         }
 
-        val picked = pickBest(key, candidates)
-        val priced = refreshPrice(platform, picked.platformItemId) ?: picked
+        val picked = SeedModelGuard.pickBest(key, candidates)
+            ?: throw IllegalStateException("搜索有价但无匹配机型: $key (${platform.code})")
+        val stable = normalizeForBinding(platform, picked)
+        val priced = refreshPrice(platform, stable.platformItemId, key) ?: stable
         if (!JdSearchRemedy.hasPrice(priced) || isMockItem(priced)) {
-            throw IllegalStateException("搜索命中但无价: $key (${platform.code}) itemId=${picked.platformItemId}")
+            throw IllegalStateException("搜索命中但无价: $key (${platform.code}) itemId=${stable.platformItemId}")
         }
-        upsertBinding(key, platform.code, priced)
-        return priced
+        if (!SeedModelGuard.matchesSeed(key, priced)) {
+            throw IllegalStateException("详情与种子型号不一致: $key (${platform.code}) title=${priced.title.take(40)}")
+        }
+        val normalized = priced.copy(platformItemId = stable.platformItemId)
+        upsertBinding(key, platform.code, normalized)
+        return normalized
+    }
+
+    /** 已绑定 ID 仍有效则直接刷新价格；京东 hash 在 getNumid 不可用时走搜索刷新 */
+    private fun tryReuseBinding(seedName: String, platform: Platform, boundId: String): AffiliateItem? {
+        val numericId = toDirectPollId(platform, boundId)
+        if (numericId != null && numericId.all { it.isDigit() } && platform == Platform.JD) {
+            val refreshed = gateway.fetchItem(platform, numericId, bypassCache = true).data ?: return null
+            if (!JdSearchRemedy.hasPrice(refreshed) || isMockItem(refreshed)) return null
+            if (!SeedModelGuard.matchesSeed(seedName, refreshed)) return null
+            val item = refreshed.copy(platformItemId = numericId)
+            if (numericId != boundId) {
+                log.info("种子绑定升级数字SKU seed={} platform={} {} -> {}", seedName, platform.code, boundId, numericId)
+                upsertBinding(seedName, platform.code, item)
+            }
+            return item
+        }
+        return refreshBySearch(platform, seedName, boundId)
     }
 
     /**
      * 多级召回搜索：完整商品名 → 降维关键词 → 品牌+型号（与分享解析/分析页一致）。
-     * 合并多轮结果后再筛选有价商品，避免「12GB+256GB 国行」一类长词一次搜空就失败。
      */
     private fun searchWithRecall(platform: Platform, seedName: String, searchLimit: Int): List<AffiliateItem> {
         val seen = linkedSetOf<String>()
@@ -67,15 +89,43 @@ class SeedPriceResolver(
                 val dedupeKey = "${item.platform}_${item.platformItemId}"
                 if (seen.add(dedupeKey)) merged.add(item)
             }
-            if (merged.any { JdSearchRemedy.hasPrice(it) && !isMockItem(it) }) break
+            if (merged.any { SeedModelGuard.matchesSeed(seedName, it) && !isMockItem(it) }) break
         }
         return merged.filter { JdSearchRemedy.hasPrice(it) && !isMockItem(it) }
     }
 
-    /** 搜索命中后走 fetchItem 补全/刷新价格（promotiongoodsinfo + 搜索补救） */
-    private fun refreshPrice(platform: Platform, itemId: String): AffiliateItem? {
-        val refreshed = gateway.fetchItem(platform, itemId, bypassCache = true).data ?: return null
-        return refreshed.takeUnless { isMockItem(it) }
+    private fun refreshPrice(platform: Platform, itemId: String, seedName: String): AffiliateItem? {
+        val numericId = toDirectPollId(platform, itemId)
+        if (numericId != null && numericId.all { it.isDigit() } && platform == Platform.JD) {
+            val refreshed = gateway.fetchItem(platform, numericId, bypassCache = true).data ?: return null
+            return refreshed.takeUnless { isMockItem(it) }?.copy(platformItemId = numericId)
+        }
+        return refreshBySearch(platform, seedName, itemId)
+    }
+
+    /** 按种子名搜索，优先复用已绑定的 platform_item_id */
+    private fun refreshBySearch(platform: Platform, seedName: String, preferredId: String): AffiliateItem? {
+        val candidates = searchWithRecall(platform, seedName, 10)
+        val picked = candidates.firstOrNull {
+            it.platformItemId == preferredId && SeedModelGuard.matchesSeed(seedName, it)
+        } ?: SeedModelGuard.pickBest(seedName, candidates) ?: return null
+        return picked.copy(platformItemId = normalizeForBinding(platform, picked).platformItemId)
+    }
+
+    /** 搜索命中后归一化为 binding ID（数字 SKU 优先，getNumid 失败则保留 hash / goods_sign） */
+    private fun normalizeForBinding(platform: Platform, item: AffiliateItem): AffiliateItem {
+        val stableId = toDirectPollId(platform, item.platformItemId) ?: item.platformItemId
+        return item.copy(platformItemId = stableId)
+    }
+
+    /** 转为批量直查 ID：京东数字 SKU / 拼多多 goods_sign */
+    internal fun toDirectPollId(platform: Platform, itemId: String): String? = when (platform) {
+        Platform.JD -> when {
+            itemId.all { it.isDigit() } -> itemId
+            else -> gateway.resolveNumericItemId(platform, itemId)
+        }
+        Platform.PDD -> itemId.takeIf { PddLinkParser.isGoodsSign(it) }
+        else -> null
     }
 
     private fun upsertBinding(seedName: String, platform: String, item: AffiliateItem) {
@@ -98,7 +148,6 @@ class SeedPriceResolver(
         }
     }
 
-    /** 生产关闭 mock 时拒绝 mock 数据源（降级链兜底或历史假绑定）。 */
     private fun rejectMockSource(result: AffiliateResult<List<AffiliateItem>>, platform: Platform) {
         if (affiliateProps.mock) return
         if (result.source == "mock") {
@@ -106,7 +155,6 @@ class SeedPriceResolver(
         }
     }
 
-    /** MockCatalog 生成的 itemId 形如 jd_iphone16pro / pdd_mate70pro，与真实 SKU / goodsSign 区分。 */
     internal fun isMockItem(item: AffiliateItem): Boolean {
         if (affiliateProps.mock) return false
         val id = item.platformItemId
@@ -116,26 +164,5 @@ class SeedPriceResolver(
             else -> return item.title.startsWith("Mock商品")
         }
         return suffix.isNotEmpty() && !suffix.all { it.isDigit() }
-    }
-
-    /** 标题匹配分 + 自营/旗舰店优先 */
-    internal fun pickBest(keyword: String, candidates: List<AffiliateItem>): AffiliateItem {
-        val tokens = keyword.lowercase()
-            .split(Regex("""[\s，,、/|]+"""))
-            .map { it.trim() }
-            .filter { it.length >= 2 }
-        return candidates.maxBy { scoreCandidate(it, tokens) }
-    }
-
-    private fun scoreCandidate(item: AffiliateItem, tokens: List<String>): Int {
-        val title = item.title.lowercase()
-        var score = tokens.count { title.contains(it) } * 10
-        when (item.shopType) {
-            "self" -> score += 8
-            "flagship" -> score += 5
-        }
-        if (title.contains("自营")) score += 4
-        if (title.contains("百亿补贴")) score += 2
-        return score
     }
 }

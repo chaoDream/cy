@@ -77,4 +77,8 @@ interface AffiliateProvider {
     fun fetchItemsBatch(ctx: AffiliateContext, itemIds: List<String>): List<AffiliateItem> = emptyList()
 
     fun buildCpsLink(ctx: AffiliateContext, itemId: String): String?
+
+    /** 联盟字符串 ID → 平台数字 SKU（京东 getNumid）；已是数字则原样返回 */
+    fun resolveNumericItemId(ctx: AffiliateContext, itemId: String): String? =
+        itemId.takeIf { it.all(Char::isDigit) }
 }

@@ -1,5 +1,6 @@
 package com.zdsj.product
 
+import com.zdsj.affiliate.ActivityTags
 import com.zdsj.affiliate.AffiliateItem
 import com.zdsj.affiliate.Platform
 import com.zdsj.affiliate.provider.AffiliateGateway
@@ -78,7 +79,7 @@ class RecommendService(
                             "imageUrl" to imageStorage.displayUrl(raw),
                             "bestFinalPrice" to affiliate.rawPrice.takeIf { it > BigDecimal.ZERO },
                             "shopName" to affiliate.shopName,
-                            "activityTags" to affiliate.activityTags,
+                            "activityTags" to ActivityTags.sanitize(affiliate.activityTags),
                         ),
                     )
                 }
@@ -141,7 +142,7 @@ class RecommendService(
                     "imageUrl" to imageStorage.displayUrl(raw),
                     "bestFinalPrice" to affiliate.rawPrice.takeIf { it > BigDecimal.ZERO },
                     "shopName" to affiliate.shopName,
-                    "activityTags" to affiliate.activityTags,
+                    "activityTags" to ActivityTags.sanitize(affiliate.activityTags),
                 ),
             )
         }

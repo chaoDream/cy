@@ -1,6 +1,7 @@
 package com.zdsj.affiliate.jd
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.zdsj.affiliate.ActivityTags
 import com.zdsj.affiliate.AffiliateItem
 import com.zdsj.affiliate.JdGoodsMatcher
 import com.zdsj.affiliate.JdLinkParser
@@ -51,7 +52,7 @@ class JdUnionService(
                 couponInfo = emptyMap(),
                 subsidyAmount = BigDecimal.ZERO,
                 freight = BigDecimal.ZERO,
-                activityTags = listOf("京东联盟"),
+                activityTags = emptyList(),
                 sourceUrl = JdLinkParser.extractUrl(sourceLink.orEmpty()),
             )
         }
@@ -259,7 +260,7 @@ class JdUnionService(
             // 活动/券已在 couponInfo 拆项，不再用 price−lowestCouponPrice 反推（会重复扣减）
             subsidyAmount = BigDecimal.ZERO,
             freight = BigDecimal.ZERO,
-            activityTags = tags,
+            activityTags = ActivityTags.sanitize(tags),
             sourceUrl = node.path("materialUrl").asText(null),
             platformBrand = meta.brandName,
             platformSpuId = meta.spuId,
@@ -282,7 +283,7 @@ class JdUnionService(
             couponInfo = emptyMap(),
             subsidyAmount = BigDecimal.ZERO,
             freight = BigDecimal.ZERO,
-            activityTags = listOf("京东联盟"),
+            activityTags = emptyList(),
             sourceUrl = node.path("materialUrl").asText(null),
         )
     }
