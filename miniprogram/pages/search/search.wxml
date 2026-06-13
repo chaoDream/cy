@@ -36,32 +36,19 @@
       <text class="section-title">最近查询</text>
       <text wx:if="{{recentHasMore}}" class="section-more" bindtap="onShowRecentPopup">更多 ›</text>
     </view>
-    <view class="recent-list">
+    <view class="recent-chips">
       <view
-        class="recent-row"
+        class="recent-chip"
         wx:for="{{recentVisible}}"
         wx:key="itemId"
         data-platform="{{item.platform}}"
         data-itemid="{{item.itemId}}"
         bindtap="onRecentTap"
       >
-        <image
-          wx:if="{{item.imageUrl && !item._imgErr}}"
-          class="recent-thumb"
-          src="{{item.imageUrl}}"
-          mode="aspectFill"
-          lazy-load
-          binderror="onRecentImgError"
-          data-platform="{{item.platform}}"
-          data-itemid="{{item.itemId}}"
-        />
-        <view wx:else class="recent-thumb recent-thumb-fallback recent-thumb-{{item.platform}}">
+        <view class="recent-chip-dot recent-chip-dot-{{item.platform}}">
           <text>{{item.platform === 'jd' ? '京' : '拼'}}</text>
         </view>
-        <view class="recent-body">
-          <text class="recent-model">{{item.displayTitle}}</text>
-          <text class="recent-platform">{{item.platformText}}</text>
-        </view>
+        <text class="recent-chip-name">{{item.displayTitle}}</text>
       </view>
     </view>
   </view>

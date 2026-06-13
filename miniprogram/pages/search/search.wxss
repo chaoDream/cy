@@ -59,57 +59,45 @@
   color: #1a73e8;
   padding: 8rpx 0;
 }
-.recent-list {
+.recent-chips {
   display: flex;
-  flex-direction: column;
-  gap: 12rpx;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  max-height: 120rpx;
+  overflow: hidden;
 }
-.recent-row {
+.recent-chip {
   display: flex;
   align-items: center;
-  gap: 20rpx;
+  gap: 10rpx;
   background: #fff;
-  border-radius: 16rpx;
-  padding: 16rpx 20rpx;
-  box-sizing: border-box;
-}
-.recent-thumb {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 12rpx;
-  background: #f2f3f5;
+  border: 1rpx solid #e8e9eb;
+  border-radius: 999rpx;
+  padding: 8rpx 20rpx 8rpx 8rpx;
   flex-shrink: 0;
 }
-.recent-thumb-fallback {
+.recent-chip-dot {
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 32rpx;
+  font-size: 20rpx;
   font-weight: 700;
   color: #fff;
+  flex-shrink: 0;
 }
-.recent-thumb-jd { background: linear-gradient(135deg, #e1251b, #ff6b57); }
-.recent-thumb-pdd { background: linear-gradient(135deg, #e02e24, #ff8a65); }
-.recent-body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6rpx;
-}
-.recent-model {
-  font-size: 28rpx;
-  line-height: 1.4;
+.recent-chip-dot-jd { background: linear-gradient(135deg, #e1251b, #ff6b57); }
+.recent-chip-dot-pdd { background: linear-gradient(135deg, #e02e24, #ff8a65); }
+.recent-chip-name {
+  font-size: 24rpx;
   font-weight: 500;
   color: #202124;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  white-space: nowrap;
+  max-width: 240rpx;
   overflow: hidden;
-}
-.recent-platform {
-  font-size: 22rpx;
-  color: #8a9099;
+  text-overflow: ellipsis;
 }
 
 /* 好价推荐 */
@@ -170,6 +158,55 @@
   color: #b0b4ba;
   font-size: 24rpx;
   padding: 24rpx 0 16rpx;
+}
+
+/* 最近查询弹窗（列表行样式） */
+.recent-row {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 16rpx 20rpx;
+  box-sizing: border-box;
+}
+.recent-thumb {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 12rpx;
+  background: #f2f3f5;
+  flex-shrink: 0;
+}
+.recent-thumb-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #fff;
+}
+.recent-thumb-jd { background: linear-gradient(135deg, #e1251b, #ff6b57); }
+.recent-thumb-pdd { background: linear-gradient(135deg, #e02e24, #ff8a65); }
+.recent-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+.recent-model {
+  font-size: 28rpx;
+  line-height: 1.4;
+  font-weight: 500;
+  color: #202124;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.recent-platform {
+  font-size: 22rpx;
+  color: #8a9099;
 }
 
 /* 最近查询弹窗 */
