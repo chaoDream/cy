@@ -1,5 +1,8 @@
 package com.zdsj.price
 
+import com.zdsj.affiliate.AffiliateItem
+import com.zdsj.affiliate.JdSearchRemedy
+import com.zdsj.affiliate.PddLinkParser
 import com.zdsj.affiliate.Platform
 import com.zdsj.affiliate.provider.AffiliateGateway
 import com.zdsj.config.PriceSeedProperties
@@ -13,13 +16,17 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * 冷启动种子采价：YAML 配商品名 → 自动在京东/拼多多搜索 → 每天定时采价写历史。
+ * 冷启动种子采价：
+ * 1. 已绑定数字 SKU / goods_sign → **批量直查**（京东 promotiongoodsinfo / 拼多多 goodssearch）
+ * 2. 未绑定 → 名称搜索发现，成功后写入 price_seed_binding，下次走批量直查
  */
 @Component
 @ConditionalOnProperty(prefix = "zdsj.price-seed", name = ["enabled"], havingValue = "true")
 class SeedPricePollingJob(
     private val seedProps: PriceSeedProperties,
     private val resolver: SeedPriceResolver,
+    private val bindingRepo: PriceSeedBindingRepository,
+    private val gateway: AffiliateGateway,
     private val ingestService: ProductIngestService,
     private val skuService: SkuService,
     private val priceEngine: PriceEngine,
@@ -29,54 +36,125 @@ class SeedPricePollingJob(
 
     @PostConstruct
     fun logStartup() {
-        val items = seedProps.enabledItems().filter { it.isNameMode() }
-        log.info("种子采价已启用：共 {} 个商品名，cron={}", items.size, seedProps.pollCron)
+        val items = seedProps.enabledItems()
+        log.info("种子采价已启用：共 {} 个商品，cron={}", items.size, seedProps.pollCron)
     }
 
-    /** 每天定时（默认 06:00） */
     @Scheduled(cron = "\${zdsj.price-seed.poll-cron}")
     fun pollDaily() {
-        if (seedProps.enabledItems().filter { it.isNameMode() }.isEmpty()) return
+        if (seedProps.enabledItems().isEmpty()) return
         val r = runOnce("每日")
-        log.info("种子采价[每日] 完成 共{} 成功{} 失败{} 耗时{}ms", r.total, r.success, r.failed, r.durationMs)
+        log.info(
+            "种子采价[每日] 完成 共{} 成功{} 失败{} 批量{} 搜索{} 耗时{}ms",
+            r.total, r.success, r.failed, r.batchCount, r.discoveryCount, r.durationMs,
+        )
     }
 
-    /**
-     * 立即执行一次采价（供后台手动触发 / 补采）。返回成功失败统计，不抛异常。
-     */
     fun runOnce(trigger: String = "手动"): SeedPollResult {
         val started = System.currentTimeMillis()
-        val items = seedProps.enabledItems().filter { it.isNameMode() }
-        log.info("种子采价[{}] 开始 共 {} 个商品名", trigger, items.size)
+        val items = seedProps.enabledItems()
+        log.info("种子采价[{}] 开始 共 {} 个商品", trigger, items.size)
         var success = 0
         var failed = 0
+        var batchCount = 0
+        var discoveryCount = 0
         val failures = mutableListOf<String>()
-        for (seed in items) {
-            for (platformCode in seed.platforms) {
-                runCatching { pollByName(seed, platformCode) }
-                    .onSuccess { success++ }
-                    .onFailure {
+
+        val tasks = buildTasks(items)
+        val (direct, discovery) = tasks.partition { it.directItemId != null }
+        batchCount = direct.size
+        discoveryCount = discovery.size
+
+        for ((platform, group) in direct.groupBy { it.platform }) {
+            val ids = group.map { it.directItemId!! }.distinct()
+            val batchMap = gateway.fetchItemsBatch(platform, ids, bypassCache = true)
+                .data.orEmpty()
+                .associateBy { it.platformItemId }
+            for (task in group) {
+                val id = task.directItemId!!
+                val polled = runCatching {
+                    val item = resolveBatchHit(platform, id, batchMap[id])
+                    completePoll(task.seed, platform, item)
+                }.recoverCatching { batchErr ->
+                    log.info(
+                        "批量直查失败，降级名称搜索 name={} platform={} id={} reason={}",
+                        task.seed.name, platform.code, id, batchErr.message,
+                    )
+                    pollByName(task.seed, platform)
+                }
+                polled.onSuccess { success++ }
+                    .onFailure { e ->
                         failed++
-                        val msg = "${seed.name}/$platformCode: ${it.message}"
-                        if (failures.size < 50) failures.add(msg)
-                        log.warn("种子采价失败 {}", msg)
+                        recordFailure(task.seed.name, platform.code, e.message, failures)
                     }
             }
         }
+
+        for (task in discovery) {
+            runCatching { pollByName(task.seed, task.platform) }
+                .onSuccess { success++ }
+                .onFailure { e ->
+                    failed++
+                    recordFailure(task.seed.name, task.platform.code, e.message, failures)
+                }
+        }
+
         return SeedPollResult(
             total = success + failed,
             success = success,
             failed = failed,
             durationMs = System.currentTimeMillis() - started,
             failures = failures,
+            batchCount = batchCount,
+            discoveryCount = discoveryCount,
         )
     }
 
+    private data class PollTask(
+        val seed: PriceSeedProperties.SeedItem,
+        val platform: Platform,
+        val directItemId: String?,
+    )
+
+    private fun buildTasks(items: List<PriceSeedProperties.SeedItem>): List<PollTask> {
+        val tasks = mutableListOf<PollTask>()
+        for (seed in items) {
+            for (platformCode in seed.platforms) {
+                val platform = Platform.fromCode(platformCode) ?: continue
+                val direct = seed.directItemId(platform)
+                    ?: bindingRepo.findBySeedNameAndPlatform(resolver.normalizeSeedName(seed.name), platform.code)
+                        .map { it.platformItemId }
+                        .orElse(null)
+                        ?.takeIf { canDirectPoll(platform, it) }
+                tasks.add(PollTask(seed, platform, direct))
+            }
+        }
+        return tasks
+    }
+
+    private fun canDirectPoll(platform: Platform, itemId: String): Boolean = when (platform) {
+        Platform.JD -> itemId.all { it.isDigit() }
+        Platform.PDD -> PddLinkParser.isGoodsSign(itemId)
+        else -> false
+    }
+
+    /** 批量未命中时，单条 fetchItem（含 jd_search 补救）再试；仍失败则名称搜索发现 */
+    private fun resolveBatchHit(platform: Platform, itemId: String, fromBatch: AffiliateItem?): AffiliateItem {
+        val priced = sequenceOf(fromBatch, gateway.fetchItem(platform, itemId, bypassCache = true).data)
+            .filterNotNull()
+            .firstOrNull { JdSearchRemedy.hasPrice(it) && !resolver.isMockItem(it) }
+        if (priced != null) return priced
+        throw IllegalStateException("批量直查无价: $itemId (${platform.code})")
+    }
+
     @Transactional
-    fun pollByName(seed: PriceSeedProperties.SeedItem, platformCode: String) {
-        val platform = Platform.fromCode(platformCode)
-            ?: throw IllegalArgumentException("不支持的平台: $platformCode")
+    fun pollByName(seed: PriceSeedProperties.SeedItem, platform: Platform) {
         val item = resolver.resolve(seed.name, platform, seedProps.searchLimit)
+        completePoll(seed, platform, item)
+    }
+
+    @Transactional
+    fun completePoll(seed: PriceSeedProperties.SeedItem, platform: Platform, item: AffiliateItem) {
         val priceResult = recordSnapshot(item)
         resolver.touchBinding(seed.name, platform.code, ingestService.upsert(item).id!!)
         log.info(
@@ -86,7 +164,7 @@ class SeedPricePollingJob(
         )
     }
 
-    private fun recordSnapshot(item: com.zdsj.affiliate.AffiliateItem): FinalPriceResult {
+    private fun recordSnapshot(item: AffiliateItem): FinalPriceResult {
         val raw = ingestService.upsert(item)
         val (sku, _) = skuService.resolveAndPersist(raw.id!!, item)
         val priceResult = priceEngine.compute(item, UserAssets())
@@ -95,13 +173,25 @@ class SeedPricePollingJob(
         }
         return priceResult
     }
+
+    private fun recordFailure(
+        seedName: String,
+        platformCode: String,
+        message: String?,
+        failures: MutableList<String>,
+    ) {
+        val msg = "$seedName/$platformCode: ${message ?: "unknown"}"
+        if (failures.size < 50) failures.add(msg)
+        log.warn("种子采价失败 {}", msg)
+    }
 }
 
-/** 一次采价的结果汇总（手动触发接口返回用）。 */
 data class SeedPollResult(
     val total: Int,
     val success: Int,
     val failed: Int,
     val durationMs: Long,
     val failures: List<String>,
+    val batchCount: Int = 0,
+    val discoveryCount: Int = 0,
 )

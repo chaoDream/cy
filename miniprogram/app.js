@@ -16,6 +16,8 @@ App({
     pendingPrivacyResolve: null,
     pendingPrivacyEventInfo: null,
     privacyResolve: null,
+    privacyModalVisible: false,
+    onPrivacySettled: null,
     clipboardDebugLog: [],
     lastClipboardError: null,
   },

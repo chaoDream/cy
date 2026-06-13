@@ -154,6 +154,9 @@ Page(track.mergePage({
   onLoad(query) {
     const { platform, itemId } = query;
     this.setData({ platform, itemId });
+    this._govLocPending = false;
+    this._onPrivacySettled = () => this._tryShowGovLocationPopup();
+    app.globalData.onPrivacySettled = this._onPrivacySettled;
     if (query.fromItemId) {
       this._fromItem = {
         itemId: query.fromItemId,
@@ -164,6 +167,13 @@ Page(track.mergePage({
       };
     }
     this._load();
+  },
+
+  onUnload() {
+    if (app.globalData.onPrivacySettled === this._onPrivacySettled) {
+      app.globalData.onPrivacySettled = null;
+    }
+    this._govLocPending = false;
   },
 
   _load() {
@@ -249,7 +259,7 @@ Page(track.mergePage({
           platform: this.data.platform,
           is_price_compare: !sameItemBuyable,
         });
-        this._checkGovLocationPopup(productTags);
+        this._checkGovLocationPopup(res, productTags);
         this._checkTitleOverflow();
       }))
       .catch((err) => {
@@ -518,14 +528,58 @@ Page(track.mergePage({
 
   // ---- 国补定位弹窗 ----
 
-  _checkGovLocationPopup(productTags) {
-    const hasGov = productTags.some((t) => t.gov);
-    if (!hasGov) return;
+  _hasGovRegion(assets) {
+    const region = String((assets && assets.govSubsidyRegion) || '').trim();
+    return !!region && region !== '不要国补优惠';
+  },
+
+  _isGovSubsidyProduct(res, productTags) {
+    if (res.priceInfo && res.priceInfo.govSubsidyEligible) return true;
+    if ((productTags || []).some((t) => t.gov)) return true;
+    const included = (res.priceInfo && res.priceInfo.included) || [];
+    if (included.some((d) => /国补/.test(d.name || ''))) return true;
+    const flags = (res.priceInfo && res.priceInfo.uncertaintyFlags) || [];
+    if (flags.some((f) => /国补/.test(f || ''))) return true;
+    return false;
+  },
+
+  _checkGovLocationPopup(res, productTags) {
+    if (!this._isGovSubsidyProduct(res, productTags)) return;
     const assets = app.getAssets();
-    if (assets.govSubsidyRegion) return;
+    if (this._hasGovRegion(assets)) return;
     const denyTs = wx.getStorageSync(GOV_LOCATION_DENY_KEY) || 0;
     if (Date.now() - denyTs < GOV_DENY_COOLDOWN) return;
-    this.setData({ 'locModal.show': true });
+    this._govLocPending = true;
+    this._tryShowGovLocationPopup();
+  },
+
+  _isPrivacyBlocking() {
+    return new Promise((resolve) => {
+      const gd = app.globalData || {};
+      if (gd.privacyModalVisible) {
+        resolve(true);
+        return;
+      }
+      if (typeof gd.pendingPrivacyResolve === 'function' || typeof gd.privacyResolve === 'function') {
+        resolve(true);
+        return;
+      }
+      const popup = gd.privacyPopup;
+      if (popup && popup.data && popup.data.visible) {
+        resolve(true);
+        return;
+      }
+      resolve(false);
+    });
+  },
+
+  _tryShowGovLocationPopup() {
+    if (!this._govLocPending || this.data.locModal.show) return;
+    this._isPrivacyBlocking().then((blocking) => {
+      if (!this._govLocPending || blocking) return;
+      this._govLocPending = false;
+      this.setData({ 'locModal.show': true });
+    });
   },
 
   onLocAllow() {

@@ -1,5 +1,6 @@
 package com.zdsj.config
 
+import com.zdsj.affiliate.Platform
 import org.springframework.boot.context.properties.ConfigurationProperties
 import java.math.BigDecimal
 
@@ -159,17 +160,31 @@ data class PriceSeedProperties(
     val pollCron: String = "0 0 6 * * ?",
     /** 按名称搜索时每个平台取前 N 条候选 */
     val searchLimit: Int = 10,
+    /** 京东批量 promotiongoodsinfo 每批 SKU 数（维易/官方上限 100） */
+    val jdBatchSize: Int = 50,
+    /** 拼多多批量 goods_sign_list 每批数量 */
+    val pddBatchSize: Int = 20,
     val items: List<SeedItem> = emptyList(),
 ) {
     data class SeedItem(
         /** 商品名称/搜索词（推荐）：自动在京东+拼多多搜索 */
         val name: String = "",
+        /** 京东数字 SKU：配置后跳过搜索，走批量 promotiongoodsinfo 直查 */
+        val jdSkuId: String = "",
+        /** 拼多多 goods_sign：配置后跳过搜索，走批量 goodssearch 直查 */
+        val pddGoodsSign: String = "",
         /** 名称模式搜索的平台，默认京东+拼多多 */
         val platforms: List<String> = listOf("jd", "pdd"),
         val note: String? = null,
         val enabled: Boolean = true,
     ) {
         fun isNameMode(): Boolean = name.isNotBlank()
+
+        fun directItemId(platform: Platform): String? = when (platform) {
+            Platform.JD -> jdSkuId.takeIf { it.isNotBlank() && it.all(Char::isDigit) }
+            Platform.PDD -> pddGoodsSign.takeIf { it.isNotBlank() }
+            else -> null
+        }
     }
 
     fun enabledItems(): List<SeedItem> = items.filter { it.enabled && it.isNameMode() }

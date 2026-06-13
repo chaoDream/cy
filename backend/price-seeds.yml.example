@@ -1,5 +1,12 @@
 # 种子采价清单（复制为 backend/price-seeds.yml）
 # 只需写商品名称，系统会自动在京东/拼多多搜索并每天采价。
+# 成功率提升：首次跑通后会在 price_seed_binding 表绑定 SKU；
+#   之后每日采价走批量直查（京东 promotiongoodsinfo 最多 100 SKU/次）。
+# 也可显式填写 jd-sku-id / pdd-goods-sign 跳过搜索：
+#   - name: "iPhone 16 Pro 256GB 国行"
+#     jd-sku-id: "100012345678"
+#     pdd-goods-sign: "c9X2kaQJInxGZWOxwvfZRYbGOMRD_JEM3gsopa"
+#     platforms: [jd, pdd]
 #
 # 启用：enabled: true  或  启动时 PRICE_SEED_ENABLED=true
 # 改完后重启服务生效。

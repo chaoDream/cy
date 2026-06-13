@@ -133,6 +133,12 @@ class VeapiProvider(
         Platform.PDD -> pddRecommend(eliteId, limit, ctx)
     }
 
+    override fun fetchItemsBatch(ctx: AffiliateContext, itemIds: List<String>): List<AffiliateItem> = when (ctx.platform) {
+        Platform.JD -> jdPromotionBatch(itemIds)
+        Platform.PDD -> pddGoodsBatch(itemIds, ctx)
+        else -> emptyList()
+    }
+
     override fun buildCpsLink(ctx: AffiliateContext, itemId: String): String? = when (ctx.platform) {
         Platform.JD -> buildJdLink(ctx, itemId)
         Platform.PDD -> buildPddLink(ctx, itemId)
@@ -205,6 +211,27 @@ class VeapiProvider(
             if (items.isNotEmpty()) return items
         }
         return emptyList()
+    }
+
+    /** 维易批量推广查价：/jd/promotiongoodsinfo，skuIds 逗号分隔，最多 100 个/次 */
+    private fun jdPromotionBatch(skuIds: List<String>): List<AffiliateItem> {
+        if (skuIds.isEmpty()) return emptyList()
+        return skuIds.distinct().filter { it.all(Char::isDigit) }.chunked(50).flatMap { chunk ->
+            val data = client.get("/jd/promotiongoodsinfo", mapOf("skuIds" to chunk.joinToString(",")))
+                ?: return@flatMap emptyList()
+            listNodes(data).mapNotNull { mapper.mapJdPromotionGoods(it) }
+        }
+    }
+
+    /** 维易批量详情：/pdd/pdd_goodssearch + goods_sign_list */
+    private fun pddGoodsBatch(goodsSigns: List<String>, ctx: AffiliateContext): List<AffiliateItem> {
+        if (goodsSigns.isEmpty()) return emptyList()
+        return goodsSigns.distinct().filter { PddLinkParser.isGoodsSign(it) }.chunked(20).flatMap { chunk ->
+            val params = mutableMapOf("goods_sign_list" to chunk.joinToString(","))
+            attachVeapiPddParams(params, ctx)
+            val data = client.get("/pdd/pdd_goodssearch", params) ?: return@flatMap emptyList()
+            listNodes(data).mapNotNull { mapper.mapPddGoods(it) }
+        }
     }
 
     /**
@@ -334,13 +361,18 @@ class VeapiProvider(
         limit: Int,
         ctx: AffiliateContext = AffiliateContext(platform = Platform.PDD, authMode = pddAuthMode()),
     ): List<AffiliateItem> {
-        val params = mutableMapOf(
-            "keyword" to keyword,
-            "page_size" to limit.coerceIn(1, 100).toString(),
-        )
-        attachVeapiPddParams(params, ctx)
-        val data = client.get("/pdd/pdd_goodssearch", params) ?: return emptyList()
-        return listNodes(data).mapNotNull { mapper.mapPddGoods(it) }
+        val pageSize = limit.coerceIn(1, 100).toString()
+        for (kw in JdSearchRemedy.recallKeywords(keyword)) {
+            val params = mutableMapOf(
+                "keyword" to kw,
+                "page_size" to pageSize,
+            )
+            attachVeapiPddParams(params, ctx)
+            val data = client.get("/pdd/pdd_goodssearch", params) ?: continue
+            val items = listNodes(data).mapNotNull { mapper.mapPddGoods(it) }
+            if (items.isNotEmpty()) return items
+        }
+        return emptyList()
     }
 
     private fun attachVeapiPddParams(params: MutableMap<String, String>, ctx: AffiliateContext) {

@@ -73,5 +73,8 @@ interface AffiliateProvider {
      */
     fun fetchMaterialRecommend(ctx: AffiliateContext, eliteId: Int, limit: Int = 10): List<AffiliateItem> = emptyList()
 
+    /** 批量直查（京东 promotiongoodsinfo 最多 100 SKU/次；拼多多 goods_sign_list） */
+    fun fetchItemsBatch(ctx: AffiliateContext, itemIds: List<String>): List<AffiliateItem> = emptyList()
+
     fun buildCpsLink(ctx: AffiliateContext, itemId: String): String?
 }

@@ -45,6 +45,11 @@ class PddOfficialProvider(
         return pddDdkService.search(keyword, limit)
     }
 
+    override fun fetchItemsBatch(ctx: AffiliateContext, itemIds: List<String>): List<AffiliateItem> {
+        guardRate()
+        return pddDdkService.fetchGoodsBatch(itemIds, customParameters = ctx.userKey)
+    }
+
     override fun buildCpsLink(ctx: AffiliateContext, itemId: String): String? {
         if (!PddLinkParser.isGoodsSign(itemId)) return null
         // ctx.userKey 为已格式化的 custom_parameters（备案用户）；游客为 null（不触发预判）

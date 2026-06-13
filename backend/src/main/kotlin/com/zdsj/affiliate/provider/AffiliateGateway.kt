@@ -66,6 +66,47 @@ class AffiliateGateway(
         }
     }
 
+    /** 批量直查 SKU / goodsSign（采价专用；空列表亦视为成功响应，由上层按 SKU 逐条降级） */
+    fun fetchItemsBatch(
+        platform: Platform,
+        itemIds: List<String>,
+        bypassCache: Boolean = true,
+    ): AffiliateResult<List<AffiliateItem>> {
+        if (itemIds.isEmpty()) return AffiliateResult(emptyList(), "none")
+        val ctx = contextFor(platform, bypassCache = bypassCache)
+        val order = providerOrder(platform)
+        val route = routeOf(platform)
+        var degraded = false
+        for ((idx, name) in order.withIndex()) {
+            val provider = byName[name] ?: continue
+            if (!provider.supports(platform)) {
+                degraded = true
+                continue
+            }
+            if (route.autoFailover && breaker.isOpen(name, platform)) {
+                degraded = true
+                continue
+            }
+            val start = System.currentTimeMillis()
+            var threw = false
+            val batch = runCatching { provider.fetchItemsBatch(ctx, itemIds) }.getOrElse {
+                threw = true
+                log.warn("[affiliate] fetchItemsBatch 失败 provider={} platform={}: {}", name, platform.code, it.message)
+                null
+            }
+            val elapsed = System.currentTimeMillis() - start
+            if (batch != null) {
+                metrics.record(name, platform, "fetchItemsBatch", batch.isNotEmpty(), elapsed)
+                breaker.recordSuccess(name, platform)
+                return AffiliateResult(batch, name, degraded = idx > 0 || degraded)
+            }
+            metrics.record(name, platform, "fetchItemsBatch", false, elapsed)
+            if (threw) breaker.recordFailure(name, platform)
+            degraded = true
+        }
+        return AffiliateResult(emptyList(), order.firstOrNull() ?: "none", degraded = true)
+    }
+
     /** 千人千面物料推荐（首页猜你喜欢等），走 primary → fallback 降级链 */
     fun fetchMaterialRecommend(
         platform: Platform,
@@ -126,6 +167,8 @@ class AffiliateGateway(
         op: String,
         call: (AffiliateProvider) -> T?,
     ): AffiliateResult<T> {
+        /** 搜索/榜单类「无结果」是正常业务空，不应累计熔断失败次数 */
+        val softMiss = op in SOFT_MISS_OPS
         val order = providerOrder(platform)
         val route = routeOf(platform)
         var degraded = false
@@ -147,7 +190,9 @@ class AffiliateGateway(
             }
 
             val start = System.currentTimeMillis()
+            var threw = false
             val result = runCatching { call(provider) }.getOrElse {
+                threw = true
                 log.warn("[affiliate] {} 失败 provider={} platform={}: {}", op, name, platform.code, it.message)
                 null
             }
@@ -159,10 +204,16 @@ class AffiliateGateway(
                 breaker.recordSuccess(name, platform)
                 return AffiliateResult(result, name, degraded = idx > 0 || degraded)
             }
-            breaker.recordFailure(name, platform)
+            if (threw || !softMiss) {
+                breaker.recordFailure(name, platform)
+            }
             degraded = true
         }
         return AffiliateResult.empty(order.firstOrNull() ?: "none", degraded = true)
+    }
+
+    private companion object {
+        val SOFT_MISS_OPS = setOf("search", "fetchEliteGoods", "fetchMaterialRecommend", "fetchItemsBatch")
     }
 
     private fun providerOrder(platform: Platform): List<String> {

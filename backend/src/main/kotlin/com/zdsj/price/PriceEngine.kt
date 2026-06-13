@@ -43,6 +43,8 @@ data class FinalPriceResult(
     val included: List<DiscountItem>,      // 已纳入优惠
     val notIncluded: List<String>,         // 未纳入优惠（可能更低）
     val uncertaintyFlags: List<String>,
+    /** 商品是否可能享国补（标签/联盟数据/配置表），供前端引导填写地区 */
+    val govSubsidyEligible: Boolean = false,
     val disclaimer: String = DISCLAIMER,
 ) {
     companion object {
@@ -79,6 +81,7 @@ class PriceEngine(
                 included = emptyList(),
                 notIncluded = emptyList(),
                 uncertaintyFlags = emptyList(),
+                govSubsidyEligible = isGovSubsidyEligible(item),
                 disclaimer = "联盟暂未返回价格，请重新粘贴链接或稍后重试",
             )
         }
@@ -136,7 +139,15 @@ class PriceEngine(
             included = included,
             notIncluded = notIncluded,
             uncertaintyFlags = uncertaintyFlags,
+            govSubsidyEligible = isGovSubsidyEligible(item),
         )
+    }
+
+    /** 是否应引导用户填写国补地区：平台标签 / 联盟国补字段 / 运营配置表 */
+    private fun isGovSubsidyEligible(item: AffiliateItem): Boolean {
+        if (item.activityTags.any { it.contains("国补") }) return true
+        if (bd(item.couponInfo["govSubsidyRate"]) > BigDecimal.ZERO) return true
+        return subsidyProps.enabled
     }
 
     /** 活动优惠明细名称（lowestPriceType：3 专享/PLUS、2 秒杀拼购、4 粉丝/预售） */

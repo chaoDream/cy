@@ -68,6 +68,9 @@
     "privacy-popup": "/components/privacy-popup/privacy-popup"
   },
   "__usePrivacyCheck__": true,
+  "requiredPrivateInfos": [
+    "getFuzzyLocation"
+  ],
   "permission": {
     "scope.userFuzzyLocation": {
       "desc": "用于推荐你所在地区的国补政策"

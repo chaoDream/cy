@@ -68,6 +68,17 @@ class PddDdkService(
         return extractGoodsList(data).mapNotNull { mapGoodsNode(it) }
     }
 
+    /** 批量 goods_sign 查详情（官方 goods.detail，每批建议 ≤20） */
+    fun fetchGoodsBatch(goodsSigns: List<String>, customParameters: String? = null): List<AffiliateItem> {
+        if (goodsSigns.isEmpty()) return emptyList()
+        return goodsSigns.distinct().filter { PddLinkParser.isGoodsSign(it) }.chunked(20).flatMap { chunk ->
+            val data = runCatching { client.goodsDetail(chunk, customParameters) }.getOrNull() ?: return@flatMap emptyList()
+            val list = data.path("goods_details")
+            if (!list.isArray) return@flatMap emptyList()
+            list.mapNotNull { mapGoodsNode(it) }
+        }
+    }
+
     fun buildCpsLink(goodsSign: String, searchId: String? = null, customParameters: String? = null): String? {
         // 比价预判：备案用户（带 custom_parameters）若被判定为比价订单（佣金归零），不生成购买链接
         if (customParameters != null && isPriceCompare(goodsSign, customParameters)) {

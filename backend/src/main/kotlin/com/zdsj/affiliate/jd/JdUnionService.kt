@@ -165,12 +165,27 @@ class JdUnionService(
 
     private fun queryPromotionInfo(skuId: String): AffiliateItem? {
         val data = client.queryPromotionGoodsInfo(listOf(skuId)) ?: return null
-        val arr = when {
-            data.isArray -> data
-            else -> data.path("data").takeIf { it.isArray } ?: return null
-        }
-        val node = arr.firstOrNull() ?: return null
+        val node = extractPromotionList(data).firstOrNull() ?: return null
         return mapPromotionNode(node, skuId)
+    }
+
+    /** 批量推广信息查价（官方 promotiongoodsinfo，最多 100 SKU/次） */
+    fun fetchPromotionBatch(skuIds: List<String>): List<AffiliateItem> {
+        if (skuIds.isEmpty()) return emptyList()
+        return skuIds.distinct().filter { it.all(Char::isDigit) }.chunked(50).flatMap { chunk ->
+            val data = client.queryPromotionGoodsInfo(chunk) ?: return@flatMap emptyList()
+            extractPromotionList(data).mapNotNull { node ->
+                val sku = node.path("skuId").asText(null)?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                mapPromotionNode(node, sku)
+            }
+        }
+    }
+
+    private fun extractPromotionList(data: JsonNode): List<JsonNode> {
+        if (data.isArray) return data.toList()
+        val nested = data.path("data")
+        if (nested.isArray) return nested.toList()
+        return emptyList()
     }
 
     private fun extractGoodsList(data: JsonNode): List<JsonNode> {

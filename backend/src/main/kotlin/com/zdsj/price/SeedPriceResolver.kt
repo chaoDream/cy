@@ -25,33 +25,57 @@ class SeedPriceResolver(
     fun normalizeSeedName(name: String): String = name.trim()
 
     /**
-     * 解析并返回联盟商品：优先用已绑定 ID；失效时重新搜索并更新绑定。
+     * 解析并返回联盟商品：优先用已绑定 ID；失效时多级关键词搜索 + 详情补价。
      */
     @Transactional
     fun resolve(seedName: String, platform: Platform, searchLimit: Int = 10): AffiliateItem {
         val key = normalizeSeedName(seedName)
         val binding = bindingRepo.findBySeedNameAndPlatform(key, platform.code).orElse(null)
 
-        // 绑定快路：仅当 itemId 为纯数字（可被 fetchItem 直查）时才走。
-        // 维易搜索返回的是 hash itemId，fetchItem 只认数字 id 会失败、还会误触熔断堵死后续搜索，
-        // 故 hash 绑定直接跳过快路重新搜索；并要求查到的商品有价，避免 mock 兜底的 0 价短路。
+        // 绑定快路：纯数字 SKU 可走 fetchItem（promotiongoodsinfo + jd_search 补救）
         if (binding != null && binding.platformItemId.all { it.isDigit() }) {
-            val cached = gateway.fetchItem(platform, binding.platformItemId, bypassCache = true).data
+            val cached = refreshPrice(platform, binding.platformItemId)
             if (cached != null && JdSearchRemedy.hasPrice(cached) && !isMockItem(cached)) return cached
             log.info("种子绑定失效，重新搜索 seed={} platform={} oldItemId={}", key, platform.code, binding.platformItemId)
         }
 
-        val keyword = key
-        val searchResult = gateway.search(platform, keyword, searchLimit)
-        rejectMockSource(searchResult, platform)
-        val candidates = searchResult.data?.filter { JdSearchRemedy.hasPrice(it) && !isMockItem(it) } ?: emptyList()
+        val candidates = searchWithRecall(platform, key, searchLimit)
         if (candidates.isEmpty()) {
-            throw IllegalStateException("搜索无结果: $keyword (${platform.code})")
+            throw IllegalStateException("搜索无结果: $key (${platform.code})")
         }
 
-        val picked = pickBest(keyword, candidates)
-        upsertBinding(key, platform.code, picked)
-        return picked
+        val picked = pickBest(key, candidates)
+        val priced = refreshPrice(platform, picked.platformItemId) ?: picked
+        if (!JdSearchRemedy.hasPrice(priced) || isMockItem(priced)) {
+            throw IllegalStateException("搜索命中但无价: $key (${platform.code}) itemId=${picked.platformItemId}")
+        }
+        upsertBinding(key, platform.code, priced)
+        return priced
+    }
+
+    /**
+     * 多级召回搜索：完整商品名 → 降维关键词 → 品牌+型号（与分享解析/分析页一致）。
+     * 合并多轮结果后再筛选有价商品，避免「12GB+256GB 国行」一类长词一次搜空就失败。
+     */
+    private fun searchWithRecall(platform: Platform, seedName: String, searchLimit: Int): List<AffiliateItem> {
+        val seen = linkedSetOf<String>()
+        val merged = mutableListOf<AffiliateItem>()
+        for (keyword in JdSearchRemedy.recallKeywords(seedName)) {
+            val searchResult = gateway.search(platform, keyword, searchLimit)
+            rejectMockSource(searchResult, platform)
+            for (item in searchResult.data.orEmpty()) {
+                val dedupeKey = "${item.platform}_${item.platformItemId}"
+                if (seen.add(dedupeKey)) merged.add(item)
+            }
+            if (merged.any { JdSearchRemedy.hasPrice(it) && !isMockItem(it) }) break
+        }
+        return merged.filter { JdSearchRemedy.hasPrice(it) && !isMockItem(it) }
+    }
+
+    /** 搜索命中后走 fetchItem 补全/刷新价格（promotiongoodsinfo + 搜索补救） */
+    private fun refreshPrice(platform: Platform, itemId: String): AffiliateItem? {
+        val refreshed = gateway.fetchItem(platform, itemId, bypassCache = true).data ?: return null
+        return refreshed.takeUnless { isMockItem(it) }
     }
 
     private fun upsertBinding(seedName: String, platform: String, item: AffiliateItem) {

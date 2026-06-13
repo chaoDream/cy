@@ -23,6 +23,11 @@ object KeywordDegrader {
     private val bracketContent = Regex("""[「【\[]([^」】\]]+)[」】\]]""")
     private val urlRegex = Regex("""https?://\S+""", RegexOption.IGNORE_CASE)
     private val capacityRegex = Regex("""\d+\s*(?:gb?|tb?)""", RegexOption.IGNORE_CASE)
+    /** 12GB+256GB / 16+512GB 等组合规格 */
+    private val comboCapacityRegex = Regex(
+        """\d+\s*(?:gb?|tb?)\s*[+＋]\s*\d+\s*(?:gb?|tb?)""",
+        RegexOption.IGNORE_CASE,
+    )
     private val multiSpace = Regex("""\s+""")
     private val tokenSplit = Regex("""[\s，,、/|]+""")
 
@@ -38,7 +43,8 @@ object KeywordDegrader {
         val base = bracketContent.find(raw)?.groupValues?.get(1)
             ?: urlRegex.replace(raw, " ")
 
-        var cleaned = capacityRegex.replace(base, " ")
+        var cleaned = comboCapacityRegex.replace(base, " ")
+        cleaned = capacityRegex.replace(cleaned, " ")
         // 去除括号残留与平台前缀噪音
         cleaned = cleaned.replace(Regex("""[「」【】\[\]（）()]"""), " ")
 

@@ -55,6 +55,11 @@ class JdOfficialProvider(
         return jdUnionService.materialRecommend(eliteId, limit, ctx.userKey)
     }
 
+    override fun fetchItemsBatch(ctx: AffiliateContext, itemIds: List<String>): List<AffiliateItem> {
+        guardRate()
+        return jdUnionService.fetchPromotionBatch(itemIds)
+    }
+
     override fun buildCpsLink(ctx: AffiliateContext, itemId: String): String? =
         jdUnionService.buildCpsLink(itemId)
 

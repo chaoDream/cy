@@ -51,6 +51,9 @@ Component({
         referrer: eventInfo && eventInfo.referrer,
         hasLink: !!this._link,
       });
+      if (app && app.globalData) {
+        app.globalData.privacyModalVisible = true;
+      }
       this.setData({ visible: true });
     },
 
@@ -61,6 +64,9 @@ Component({
       dbg.push('privacyPopup.onAgree', { hasResolve: typeof resolveFn === 'function' });
 
       this.setData({ visible: false });
+      if (app && app.globalData) {
+        app.globalData.privacyModalVisible = false;
+      }
 
       if (typeof resolveFn === 'function') {
         try {
@@ -74,6 +80,7 @@ Component({
           app.globalData.privacyResolve = null;
         }
         markPrivacyAgreed();
+        this._notifyPrivacySettled();
         return;
       }
 
@@ -83,6 +90,7 @@ Component({
       if (this._link) {
         requestClipboardCopy(this._link, this._type);
       }
+      this._notifyPrivacySettled();
     },
 
     onDisagree() {
@@ -91,6 +99,9 @@ Component({
         || (app && app.globalData && app.globalData.privacyResolve);
       dbg.push('privacyPopup.onDisagree', { hasResolve: typeof resolveFn === 'function' });
       this.setData({ visible: false });
+      if (app && app.globalData) {
+        app.globalData.privacyModalVisible = false;
+      }
       if (typeof resolveFn === 'function') {
         resolveFn({ event: 'disagree' });
         this._resolve = null;
@@ -104,6 +115,15 @@ Component({
         openCopyLinkPage(link, '', type);
       } else {
         wx.showToast({ title: '未同意隐私协议', icon: 'none' });
+      }
+      this._notifyPrivacySettled();
+    },
+
+    _notifyPrivacySettled() {
+      const app = getApp();
+      const fn = app && app.globalData && app.globalData.onPrivacySettled;
+      if (typeof fn === 'function') {
+        wx.nextTick(fn);
       }
     },
   },
