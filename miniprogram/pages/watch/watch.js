@@ -4,10 +4,10 @@ const { ensureLogin } = require('../../utils/auth');
 const { yuanTrim } = require('../../utils/format');
 const { prepareListImages } = require('../../utils/image');
 
-Page({
+Page(track.mergePage({
   data: {
     list: [],
-    notifyAll: true, // 全局降价提醒开关：只要有任一盯价在提醒即视为开启
+    notifyAll: true,
     loading: true,
     loadError: '',
   },
@@ -141,4 +141,4 @@ Page({
       wx.navigateTo({ url: `/packageA/pages/analysis/analysis?platform=${platform}&itemId=${itemid}` });
     }
   },
-});
+}, track.pageMixin('watch')));

@@ -11,7 +11,7 @@ const RECENT_STORAGE_LIMIT = 50;
 const RECENT_PAGE_SIZE = 12;
 const RECOMMEND_PAGE_SIZE = 6;
 
-Page({
+Page(track.mergePage({
   data: {
     linkText: '',
     assets: {},
@@ -270,4 +270,4 @@ Page({
       this.setData({ recent, recentVisible, recentHasMore: recent.length > RECENT_VISIBLE_COUNT });
     });
   },
-});
+}, track.pageMixin('search')));

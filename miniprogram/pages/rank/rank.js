@@ -1,6 +1,7 @@
 const api = require('../../api/index');
+const track = require('../../utils/track');
 
-Page({
+Page(track.mergePage({
   data: {
     brands: ['全部', 'Apple', '华为', '小米', 'vivo', 'OPPO', '荣耀'],
     brandIndex: 0,
@@ -38,4 +39,4 @@ Page({
       url: `/packageA/pages/analysis/analysis?platform=${item.platform}&itemId=${item.platformItemId}`,
     });
   },
-});
+}, track.pageMixin('rank')));

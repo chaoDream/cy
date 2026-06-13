@@ -1,11 +1,12 @@
 const api = require('../../api/index');
+const track = require('../../utils/track');
 const { getUserInfo, restoreLogin } = require('../../utils/auth');
 const { getToken } = require('../../utils/request');
 const { resolveImageUrl } = require('../../utils/format');
 
 const app = getApp();
 
-Page({
+Page(track.mergePage({
   data: {
     nickname: '',
     avatarUrl: '',
@@ -95,4 +96,4 @@ Page({
   goFeedback() {
     wx.navigateTo({ url: '/packageA/pages/data-notice/data-notice?mode=feedback' });
   },
-});
+}, track.pageMixin('mine')));

@@ -24,6 +24,7 @@
     .section { margin-bottom: 28px; }
     .section h2 { font-size: 14px; color: var(--muted); font-weight: 600;
       margin: 0 0 12px; text-transform: none; }
+    .divider { border: 0; border-top: 2px solid var(--line); margin: 36px 0; }
     .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
     .card .label { color: var(--muted); font-size: 12px; }
@@ -51,35 +52,58 @@
       padding: 1px 6px; border-radius: 4px; }
     .err { color: var(--red); }
     code { background: #f1f3f4; padding: 1px 6px; border-radius: 4px; }
+    .stat-row { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+    .stat-card { flex: 1; min-width: 120px; background: var(--card); border: 1px solid var(--line);
+      border-radius: 10px; padding: 14px 16px; text-align: center; }
+    .stat-card .label { color: var(--muted); font-size: 12px; }
+    .stat-card .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+    .stat-card .sub { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .hour-chart { display: flex; align-items: flex-end; gap: 2px; height: 80px; }
+    .hour-bar { flex: 1; background: var(--blue); border-radius: 2px 2px 0 0; min-width: 6px;
+      position: relative; }
+    .hour-bar:hover::after { content: attr(data-tip); position: absolute; bottom: 100%; left: 50%;
+      transform: translateX(-50%); background: #333; color: #fff; font-size: 11px;
+      padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+    .hour-labels { display: flex; gap: 2px; }
+    .hour-labels span { flex: 1; text-align: center; font-size: 10px; color: var(--muted); min-width: 6px; }
+    select.days-select { border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px;
+      font-size: 13px; background: var(--card); margin-left: 8px; }
   </style>
 </head>
 <body>
   <header>
     <h1>真到手价 · 数据总览</h1>
     <span class="meta" id="genAt">加载中…</span>
-    <button id="refreshBtn" onclick="load()">刷新</button>
+    <button id="refreshBtn" onclick="loadAll()">刷新</button>
   </header>
   <main id="root">
-    <p style="color:var(--muted)">正在拉取 /api/admin/overview …</p>
+    <p style="color:var(--muted)">正在加载…</p>
   </main>
 
   <script>
     const fmt = n => (n === null || n === undefined) ? '—' : Number(n).toLocaleString('zh-CN');
     const el = (t, c, h) => { const e = document.createElement(t); if (c) e.className = c; if (h !== undefined) e.innerHTML = h; return e; };
 
-    async function load() {
+    let analyticsDays = 7;
+
+    async function loadAll() {
       const btn = document.getElementById('refreshBtn');
       btn.disabled = true; btn.textContent = '刷新中…';
       try {
-        const res = await fetch('/api/admin/overview', { headers: { 'Accept': 'application/json' } });
-        const json = await res.json();
-        if (json.code !== 0) throw new Error(json.message || ('code ' + json.code));
-        render(json.data);
+        const [ovRes, anRes] = await Promise.all([
+          fetch('/api/admin/overview', { headers: { 'Accept': 'application/json' } }),
+          fetch('/api/admin/analytics?days=' + analyticsDays, { headers: { 'Accept': 'application/json' } }),
+        ]);
+        const ovJson = await ovRes.json();
+        const anJson = await anRes.json();
+        if (ovJson.code !== 0) throw new Error(ovJson.message || ('code ' + ovJson.code));
+        if (anJson.code !== 0) throw new Error(anJson.message || ('code ' + anJson.code));
+        renderAll(ovJson.data, anJson.data);
       } catch (e) {
         const wrongOrigin = location.protocol === 'file:' || /Failed to fetch|NetworkError/i.test(e.message || '');
         const hint = wrongOrigin
           ? '<p class="err">加载失败：' + (e.message || e) + '</p>' +
-            '<p style="color:var(--muted)">这个看板必须由后端同源托管。请不要直接打开 html 文件，改为用后端地址访问：<br>' +
+            '<p style="color:var(--muted)">这个看板必须由后端同源托管，请通过后端地址访问：<br>' +
             '<code>http://' + (location.hostname && location.protocol !== 'file:' ? location.hostname : 'localhost') + ':8080/admin/</code></p>'
           : '<p class="err">加载失败：' + (e.message || e) + '</p>';
         document.getElementById('root').innerHTML = hint;
@@ -88,48 +112,176 @@
       }
     }
 
-    function render(d) {
-      document.getElementById('genAt').textContent = '更新于 ' + new Date(d.generatedAt).toLocaleString('zh-CN');
+    function renderAll(ov, an) {
+      document.getElementById('genAt').textContent = '更新于 ' + new Date(ov.generatedAt).toLocaleString('zh-CN');
       const root = document.getElementById('root');
       root.innerHTML = '';
 
-      // 1. 今日定时采价信号
-      const ps = d.priceSnapshot || {};
-      const seed = d.priceSeed || {};
-      const ran = ps.seedJobLikelyRanToday;
-      const banner = el('div', 'section');
-      banner.appendChild(el('h2', null, '今日定时采价（约 06:00）'));
+      // ── 顶部概览卡片：DAU + 留存 + 采价状态 + 数据量 ──
+      const r1 = an.retentionDay1 || {}; const r7 = an.retentionDay7 || {};
+      const dau = an.dau || [];
+      const todayDau = dau.length ? dau[0].users : 0;
+      const ps = ov.priceSnapshot || {};
+      const seed = ov.priceSeed || {};
+      const totalEvents = (an.eventRanking || []).reduce((s, e) => s + (e.count || 0), 0);
+
+      const statRow = el('div', 'stat-row');
+      statRow.appendChild(statCard('今日 DAU', fmt(todayDau), '活跃用户数'));
+      statRow.appendChild(statCard('次日留存', r1.rate + '%', r1.retained + '/' + r1.cohortSize));
+      statRow.appendChild(statCard('7日留存', r7.rate + '%', r7.retained + '/' + r7.cohortSize));
+      statRow.appendChild(statCard('今日快照', fmt(ps.todayTotal), seed.enabled
+        ? (ps.seedJobLikelyRanToday ? '✓ 已采价' : '✗ 未采价')
+        : '采价未开启'));
+      statRow.appendChild(statCard('总事件', fmt(totalEvents), analyticsDays + ' 天内'));
+      root.appendChild(statRow);
+
+      // ── 时间范围选择 ──
+      const ctrl = el('div', 'section');
+      ctrl.style.marginBottom = '8px';
+      const selLabel = el('span', 'meta', '以下图表时间范围');
+      const sel = document.createElement('select');
+      sel.className = 'days-select';
+      [7, 14, 30, 90].forEach(v => {
+        const o = document.createElement('option');
+        o.value = v; o.textContent = v + ' 天'; o.selected = v === analyticsDays;
+        sel.appendChild(o);
+      });
+      sel.onchange = () => { analyticsDays = Number(sel.value); loadAll(); };
+      ctrl.appendChild(selLabel); ctrl.appendChild(sel);
+      root.appendChild(ctrl);
+
+      // ── DAU 趋势 ──
+      if (dau.length) {
+        const s = el('div', 'section');
+        s.appendChild(el('h2', null, '每日活跃用户（DAU）'));
+        const max = Math.max(...dau.map(x => x.users), 1);
+        const bars = el('div', 'bars');
+        dau.forEach(x => {
+          const row = el('div', 'bar-row');
+          row.appendChild(el('span', 'd', x.date));
+          const track = el('div', 'track');
+          const fill = el('div', 'fill'); fill.style.width = (x.users / max * 100) + '%';
+          track.appendChild(fill); row.appendChild(track);
+          row.appendChild(el('span', 'n', fmt(x.users)));
+          bars.appendChild(row);
+        });
+        s.appendChild(bars);
+        root.appendChild(s);
+      }
+
+      // ── 活跃时段分布 ──
+      const hours = an.hourlyDistribution || [];
+      if (hours.length) {
+        const s = el('div', 'section');
+        s.appendChild(el('h2', null, '用户活跃时段分布'));
+        const hMax = Math.max(...hours.map(x => x.count), 1);
+        const allHours = Array.from({ length: 24 }, (_, i) => {
+          const found = hours.find(h => h.hour === i);
+          return { hour: i, count: found ? found.count : 0 };
+        });
+        const chart = el('div', 'hour-chart');
+        allHours.forEach(h => {
+          const bar = el('div', 'hour-bar');
+          bar.style.height = Math.max(h.count / hMax * 100, 2) + '%';
+          bar.setAttribute('data-tip', h.hour + ':00 — ' + fmt(h.count) + ' 次');
+          chart.appendChild(bar);
+        });
+        s.appendChild(chart);
+        const labels = el('div', 'hour-labels');
+        allHours.forEach(h => labels.appendChild(el('span', null, h.hour % 3 === 0 ? h.hour + '' : '')));
+        s.appendChild(labels);
+        root.appendChild(s);
+      }
+
+      // ── 页面浏览量 + 停留时长（并排） ──
+      const pv = an.pageViews || [];
+      const dur = an.avgDuration || [];
+      if (pv.length || dur.length) {
+        const wrapper = el('div', 'section');
+        wrapper.style.display = 'grid';
+        wrapper.style.gridTemplateColumns = 'repeat(auto-fit, minmax(350px, 1fr))';
+        wrapper.style.gap = '16px';
+
+        if (pv.length) {
+          const box = el('div');
+          box.appendChild(el('h2', null, '页面浏览量'));
+          const tbl = el('table');
+          tbl.innerHTML = '<thead><tr><th>页面</th><th style="text-align:right">PV</th><th style="text-align:right">UV</th></tr></thead>';
+          const tb = el('tbody');
+          pv.forEach(p => {
+            const tr = el('tr');
+            tr.appendChild(el('td', null, '<span class="tag">' + (p.page || '—') + '</span>'));
+            tr.appendChild(el('td', 'num', fmt(p.pv)));
+            tr.appendChild(el('td', 'num', fmt(p.uv)));
+            tb.appendChild(tr);
+          });
+          tbl.appendChild(tb); box.appendChild(tbl);
+          wrapper.appendChild(box);
+        }
+        if (dur.length) {
+          const box = el('div');
+          box.appendChild(el('h2', null, '页面停留时长'));
+          const tbl = el('table');
+          tbl.innerHTML = '<thead><tr><th>页面</th><th style="text-align:right">均值(秒)</th><th style="text-align:right">中位(秒)</th><th style="text-align:right">样本</th></tr></thead>';
+          const tb = el('tbody');
+          dur.forEach(p => {
+            const tr = el('tr');
+            tr.appendChild(el('td', null, '<span class="tag">' + (p.page || '—') + '</span>'));
+            tr.appendChild(el('td', 'num', p.avgSec));
+            tr.appendChild(el('td', 'num', Math.round(p.medianSec)));
+            tr.appendChild(el('td', 'num', fmt(p.samples)));
+            tb.appendChild(tr);
+          });
+          tbl.appendChild(tb); box.appendChild(tbl);
+          wrapper.appendChild(box);
+        }
+        root.appendChild(wrapper);
+      }
+
+      // ── 事件排行 ──
+      const ev = an.eventRanking || [];
+      if (ev.length) {
+        const s = el('div', 'section');
+        s.appendChild(el('h2', null, '事件触发排行'));
+        const tbl = el('table');
+        tbl.innerHTML = '<thead><tr><th>事件</th><th style="text-align:right">次数</th><th style="text-align:right">用户数</th></tr></thead>';
+        const tb = el('tbody');
+        ev.forEach(e => {
+          const tr = el('tr');
+          tr.appendChild(el('td', null, '<span class="tag">' + e.event + '</span>'));
+          tr.appendChild(el('td', 'num', fmt(e.count)));
+          tr.appendChild(el('td', 'num', fmt(e.users)));
+          tb.appendChild(tr);
+        });
+        tbl.appendChild(tb); s.appendChild(tbl);
+        root.appendChild(s);
+      }
+
+      // ── 分隔线 ──
+      root.appendChild(el('hr', 'divider'));
+
+      // ── 采价 & 业务数据（精简） ──
+      const seedSec = el('div', 'section');
+      seedSec.appendChild(el('h2', null, '定时采价'));
       const b = el('div', 'banner');
-      b.appendChild(el('span', 'pill ' + (ran ? 'ok' : 'no'), ran ? '✓ 今天已执行' : '✗ 今天未见执行'));
+      b.appendChild(el('span', 'pill ' + (ps.seedJobLikelyRanToday ? 'ok' : 'no'),
+        ps.seedJobLikelyRanToday ? '✓ 今天已执行' : '✗ 今天未见执行'));
       b.appendChild(el('span', 'big', fmt(ps.todayTotal) + ' 条今日快照'));
       b.appendChild(el('span', 'meta',
-        '06:00 窗口内 ' + fmt(ps.seedWindowCount) + ' 条 · 今日最早 ' +
+        '06:00 窗口 ' + fmt(ps.seedWindowCount) + ' 条 · 最早 ' +
         (ps.firstSnapshotToday ? new Date(ps.firstSnapshotToday).toLocaleTimeString('zh-CN') : '—')));
       b.appendChild(el('span', 'pill ' + (seed.enabled ? 'muted' : 'no'),
-        '采价开关 ' + (seed.enabled ? '开' : '关')));
-      b.appendChild(el('span', 'meta',
-        'cron ' + (seed.pollCron || '—') + ' · ' + fmt(seed.enabledItemCount) + ' 个商品名'));
-      const runBtn = el('button', 'run-btn', '立即重新采价');
+        '开关 ' + (seed.enabled ? '开' : '关')));
+      const runBtn = el('button', 'run-btn', '立即采价');
       runBtn.style.marginLeft = 'auto';
       if (!seed.enabled) { runBtn.disabled = true; runBtn.title = '采价开关未开启'; }
       runBtn.onclick = runPoll;
       b.appendChild(runBtn);
-      banner.appendChild(b);
-      // 今日各平台
-      if ((ps.todayByPlatform || []).length) {
-        const g = el('div', 'grid'); g.style.marginTop = '12px';
-        ps.todayByPlatform.forEach(p => {
-          const c = el('div', 'card');
-          c.appendChild(el('div', 'label', '今日 · ' + p.platform));
-          c.appendChild(el('div', 'value', fmt(p.count)));
-          g.appendChild(c);
-        });
-        banner.appendChild(g);
-      }
-      root.appendChild(banner);
+      seedSec.appendChild(b);
+      root.appendChild(seedSec);
 
-      // 2. 近7日快照趋势
-      const days = ps.last7Days || [];
+      // 近7日快照趋势
+      const days = (ps.last7Days || []);
       if (days.length) {
         const s = el('div', 'section');
         s.appendChild(el('h2', null, '近 7 日价格快照'));
@@ -148,11 +300,11 @@
         root.appendChild(s);
       }
 
-      // 3. 各业务表行数
+      // 业务表行数
       const s2 = el('div', 'section');
       s2.appendChild(el('h2', null, '业务数据表行数'));
       const g2 = el('div', 'grid');
-      (d.tables || []).forEach(t => {
+      (ov.tables || []).forEach(t => {
         const c = el('div', 'card');
         c.appendChild(el('div', 'label', t.table));
         c.appendChild(el('div', 'value', t.count === null ? '<span class="err">err</span>' : fmt(t.count)));
@@ -161,35 +313,25 @@
       s2.appendChild(g2);
       root.appendChild(s2);
 
-      // 4. Redis 缓存
-      const r = d.redis || {};
+      // Redis 概览（精简：只显示总 key 数 + 前缀分布）
+      const r = ov.redis || {};
       const s3 = el('div', 'section');
       s3.appendChild(el('h2', null, 'Redis 缓存'));
       if (!r.available) {
         s3.appendChild(el('p', 'err', 'Redis 不可用：' + (r.error || '')));
       } else {
-        const head = el('div', 'banner'); head.style.marginBottom = '12px';
+        const head = el('div', 'banner');
         head.appendChild(el('span', 'big', fmt(r.totalKeys) + ' 个 key'));
         (r.byPrefix || []).forEach(p =>
           head.appendChild(el('span', 'tag', p.prefix + ' · ' + fmt(p.count))));
         s3.appendChild(head);
-        if ((r.sampleKeys || []).length) {
-          const tbl = el('table');
-          tbl.innerHTML = '<thead><tr><th>样例 key（最多 50）</th></tr></thead>';
-          const tb = el('tbody');
-          r.sampleKeys.forEach(k => {
-            const tr = el('tr'); tr.appendChild(el('td', null, '<span class="tag">' + k + '</span>'));
-            tb.appendChild(tr);
-          });
-          tbl.appendChild(tb); s3.appendChild(tbl);
-        }
       }
       root.appendChild(s3);
     }
 
     async function runPoll(ev) {
       const btn = ev.currentTarget;
-      if (!confirm('立即对全部启用商品采价一次？耗时取决于商品数与上游响应，请稍候。')) return;
+      if (!confirm('立即对全部启用商品采价一次？')) return;
       btn.disabled = true; btn.textContent = '采价中…';
       try {
         const res = await fetch('/api/admin/price-seed/run', { method: 'POST', headers: { 'Accept': 'application/json' } });
@@ -199,14 +341,22 @@
         alert('采价完成：成功 ' + d.success + ' / 失败 ' + d.failed + ' / 共 ' + d.total +
           '，耗时 ' + (d.durationMs / 1000).toFixed(1) + 's' +
           (d.failed ? '\n\n失败示例：\n' + (d.failures || []).slice(0, 8).join('\n') : ''));
-        load();
+        loadAll();
       } catch (e) {
         alert('采价请求出错：' + (e.message || e));
-        btn.disabled = false; btn.textContent = '立即重新采价';
+        btn.disabled = false; btn.textContent = '立即采价';
       }
     }
 
-    load();
+    function statCard(label, value, sub) {
+      const c = el('div', 'stat-card');
+      c.appendChild(el('div', 'label', label));
+      c.appendChild(el('div', 'value', value));
+      if (sub) c.appendChild(el('div', 'sub', sub));
+      return c;
+    }
+
+    loadAll();
   </script>
 </body>
 </html>

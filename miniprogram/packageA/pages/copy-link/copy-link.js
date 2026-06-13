@@ -1,6 +1,7 @@
 const { copyPurchaseLink, buildPurchaseGuide } = require('../../../utils/purchase');
+const track = require('../../../utils/track');
 
-Page({
+Page(track.mergePage({
   data: {
     link: '',
     reason: '',
@@ -30,4 +31,4 @@ Page({
     }
     copyPurchaseLink(link, linkType || 'default', platform);
   },
-});
+}, track.pageMixin('copy-link')));

@@ -119,7 +119,7 @@ function buildProdView(res, platformText, shopTypeText, productTags) {
   };
 }
 
-Page({
+Page(track.mergePage({
   data: {
     loading: true,
     error: '',
@@ -589,4 +589,4 @@ Page({
       path: `/packageA/pages/analysis/analysis?platform=${this.data.platform}&itemId=${this.data.itemId}`,
     };
   },
-});
+}, track.pageMixin('analysis')));

@@ -10,6 +10,7 @@
 # 用法：
 #   ./scripts/push-deploy.sh              # 远程 git pull + deploy
 #   ./scripts/push-deploy.sh --push       # 先 git push 当前分支，再远程部署
+#   ./scripts/push-deploy.sh --sync-env   # 从 application-local.yml 同步密钥后再部署
 #   ./scripts/push-deploy.sh --dry-run    # 只打印将执行的命令
 #
 set -euo pipefail
@@ -22,6 +23,7 @@ DO_PUSH=false
 DRY_RUN=false
 SKIP_HEALTH=false
 FORCE=false
+SYNC_ENV=false
 
 usage() {
   cat <<'EOF'
@@ -29,6 +31,7 @@ usage() {
 
 选项:
   --push         部署前先 git push 当前分支到 origin
+  --sync-env     部署前从 backend/application-local.yml 同步密钥到本地/服务器 deploy/.env
   --dry-run      仅打印命令，不实际执行
   --skip-health  跳过部署后的 /api/health 检查
   --force        有未提交改动时也继续（配合 --push 时不会自动提交）
@@ -42,6 +45,7 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --push) DO_PUSH=true; shift ;;
+    --sync-env) SYNC_ENV=true; shift ;;
     --dry-run) DRY_RUN=true; shift ;;
     --skip-health) SKIP_HEALTH=true; shift ;;
     --force) FORCE=true; shift ;;
@@ -90,6 +94,15 @@ run() {
 }
 
 log() { echo ">>> $*"; }
+
+# ---------- 可选：从 application-local.yml 同步 deploy/.env ----------
+if $SYNC_ENV; then
+  SYNC_ARGS=()
+  $DRY_RUN && SYNC_ARGS+=(--dry-run)
+  $DRY_RUN || SYNC_ARGS+=(--remote)
+  log "从 application-local.yml 同步密钥 ..."
+  run python3 "$DEPLOY_ROOT/scripts/sync-env-from-local.py" "${SYNC_ARGS[@]}"
+fi
 
 # ---------- 本地 Git 检查 / 推送 ----------
 if [[ -d "$REPO_ROOT/.git" ]]; then

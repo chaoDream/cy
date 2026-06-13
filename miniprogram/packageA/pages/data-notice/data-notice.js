@@ -2,7 +2,7 @@ const api = require('../../../api/index');
 const track = require('../../../utils/track');
 const { ensureLogin } = require('../../../utils/auth');
 
-Page({
+Page(track.mergePage({
   data: {
     mode: 'notice', // notice | feedback
     rawProductId: '',
@@ -47,4 +47,4 @@ Page({
       })
       .catch((err) => wx.showToast({ title: err.message || '提交失败', icon: 'none' }));
   },
-});
+}, track.pageMixin('data-notice')));

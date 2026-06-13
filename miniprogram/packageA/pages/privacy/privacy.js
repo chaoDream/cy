@@ -1,6 +1,7 @@
 const { markPrivacyAgreed } = require('../../../utils/purchase');
+const track = require('../../../utils/track');
 
-Page({
+Page(track.mergePage({
   data: {
     fromPurchase: false,
   },
@@ -26,4 +27,4 @@ Page({
       setTimeout(() => wx.navigateBack(), 600);
     }
   },
-});
+}, track.pageMixin('privacy')));

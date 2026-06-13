@@ -1,7 +1,8 @@
 const { subscribeTemplateId, getApiTarget, setApiTarget, getBaseUrl, getApiTargetLabel } = require('../../../utils/config');
 const { clearLoginState } = require('../../../utils/auth');
+const track = require('../../../utils/track');
 
-Page({
+Page(track.mergePage({
   data: {
     defaultRule: 'auto', // auto | low30 | custom
     apiTarget: 'local',
@@ -53,4 +54,4 @@ Page({
       fail: () => wx.showToast({ title: '授权未完成', icon: 'none' }),
     });
   },
-});
+}, track.pageMixin('settings')));
