@@ -61,38 +61,55 @@
 }
 .recent-list {
   display: flex;
-  flex-wrap: wrap;
-  gap: 16rpx;
+  flex-direction: column;
+  gap: 12rpx;
 }
-.recent-item {
-  /* 三列：容器左右 padding 48rpx 后，用百分比均分避免只能排两列 */
-  width: calc((100% - 32rpx) / 3);
-  box-sizing: border-box;
+.recent-row {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
   background: #fff;
   border-radius: 16rpx;
-  padding: 12rpx;
+  padding: 16rpx 20rpx;
+  box-sizing: border-box;
 }
-.recent-img {
-  width: 100%;
-  height: 176rpx;
+.recent-thumb {
+  width: 96rpx;
+  height: 96rpx;
   border-radius: 12rpx;
   background: #f2f3f5;
+  flex-shrink: 0;
 }
-.recent-img-placeholder {
+.recent-thumb-fallback {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #b0b4ba;
-  font-size: 22rpx;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #fff;
 }
-.recent-title {
-  font-size: 22rpx;
+.recent-thumb-jd { background: linear-gradient(135deg, #e1251b, #ff6b57); }
+.recent-thumb-pdd { background: linear-gradient(135deg, #e02e24, #ff8a65); }
+.recent-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+.recent-model {
+  font-size: 28rpx;
   line-height: 1.4;
-  margin-top: 8rpx;
+  font-weight: 500;
+  color: #202124;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
+}
+.recent-platform {
+  font-size: 22rpx;
+  color: #8a9099;
 }
 
 /* 好价推荐 */
@@ -199,38 +216,12 @@
 }
 .popup-list {
   display: flex;
-  flex-wrap: wrap;
-  gap: 16rpx;
+  flex-direction: column;
+  gap: 12rpx;
   padding: 24rpx;
 }
-.popup-item {
-  width: calc((100% - 32rpx) / 3);
-  box-sizing: border-box;
+.popup-row {
   background: #f7f8fa;
-  border-radius: 16rpx;
-  padding: 12rpx;
-}
-.popup-item-img {
-  width: 100%;
-  height: 176rpx;
-  border-radius: 12rpx;
-  background: #f2f3f5;
-}
-.popup-item-img-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #b0b4ba;
-  font-size: 22rpx;
-}
-.popup-item-title {
-  font-size: 22rpx;
-  line-height: 1.4;
-  margin-top: 8rpx;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
 }
 .popup-loading,
 .popup-end {

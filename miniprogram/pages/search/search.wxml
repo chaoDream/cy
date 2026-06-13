@@ -38,7 +38,7 @@
     </view>
     <view wx:if="{{recentVisible.length}}" class="recent-list">
       <view
-        class="recent-item"
+        class="recent-row"
         wx:for="{{recentVisible}}"
         wx:key="itemId"
         data-platform="{{item.platform}}"
@@ -47,15 +47,21 @@
       >
         <image
           wx:if="{{item.imageUrl && !item._imgErr}}"
-          class="recent-img"
+          class="recent-thumb"
           src="{{item.imageUrl}}"
           mode="aspectFill"
           lazy-load
           binderror="onRecentImgError"
-          data-index="{{index}}"
+          data-platform="{{item.platform}}"
+          data-itemid="{{item.itemId}}"
         />
-        <view wx:else class="recent-img recent-img-placeholder">无图</view>
-        <text class="recent-title">{{item.title}}</text>
+        <view wx:else class="recent-thumb recent-thumb-fallback recent-thumb-{{item.platform}}">
+          <text>{{item.platform === 'jd' ? '京' : '拼'}}</text>
+        </view>
+        <view class="recent-body">
+          <text class="recent-model">{{item.displayTitle}}</text>
+          <text class="recent-platform">{{item.platformText}}</text>
+        </view>
       </view>
     </view>
     <view wx:else class="empty">还没有查询记录，粘贴一个链接试试吧</view>
@@ -108,7 +114,7 @@
       >
         <view class="popup-list">
           <view
-            class="popup-item"
+            class="recent-row popup-row"
             wx:for="{{recentPopupList}}"
             wx:key="itemId"
             data-platform="{{item.platform}}"
@@ -117,13 +123,21 @@
           >
             <image
               wx:if="{{item.imageUrl && !item._imgErr}}"
-              class="popup-item-img"
+              class="recent-thumb"
               src="{{item.imageUrl}}"
               mode="aspectFill"
               lazy-load
+              binderror="onRecentImgError"
+              data-platform="{{item.platform}}"
+              data-itemid="{{item.itemId}}"
             />
-            <view wx:else class="popup-item-img popup-item-img-placeholder">无图</view>
-            <text class="popup-item-title">{{item.title}}</text>
+            <view wx:else class="recent-thumb recent-thumb-fallback recent-thumb-{{item.platform}}">
+              <text>{{item.platform === 'jd' ? '京' : '拼'}}</text>
+            </view>
+            <view class="recent-body">
+              <text class="recent-model">{{item.displayTitle}}</text>
+              <text class="recent-platform">{{item.platformText}}</text>
+            </view>
           </view>
         </view>
         <view wx:if="{{recentPopupLoading}}" class="popup-loading">加载中...</view>

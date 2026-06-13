@@ -58,6 +58,27 @@ class AffiliateGateway(
         return result
     }
 
+    /** 京粉精选 / 运营频道商品（推荐页等），走 primary → fallback 降级链 */
+    fun fetchEliteGoods(platform: Platform, eliteId: Int, limit: Int = 20): AffiliateResult<List<AffiliateItem>> {
+        val ctx = contextFor(platform, bypassCache = false)
+        return runChain(platform, "fetchEliteGoods") { p ->
+            p.fetchEliteGoods(ctx, eliteId, limit).takeIf { it.isNotEmpty() }
+        }
+    }
+
+    /** 千人千面物料推荐（首页猜你喜欢等），走 primary → fallback 降级链 */
+    fun fetchMaterialRecommend(
+        platform: Platform,
+        eliteId: Int,
+        limit: Int = 10,
+        userKey: String? = null,
+    ): AffiliateResult<List<AffiliateItem>> {
+        val ctx = contextFor(platform, bypassCache = false, userKey = userKey)
+        return runChain(platform, "fetchMaterialRecommend") { p ->
+            p.fetchMaterialRecommend(ctx, eliteId, limit).takeIf { it.isNotEmpty() }
+        }
+    }
+
     /** 从分享文案识别平台并拉取（不缓存：入参高基数） */
     fun fetchFromShareText(linkText: String, userKey: String? = null): AffiliateResult<AffiliateItem> {
         val platform = detect(linkText)?.first

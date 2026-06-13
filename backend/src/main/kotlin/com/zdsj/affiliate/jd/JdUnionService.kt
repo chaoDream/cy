@@ -69,6 +69,22 @@ class JdUnionService(
         return extractGoodsList(data).mapNotNull { mapGoodsNode(it, "") }
     }
 
+    /** 千人千面物料推荐（猜你喜欢 / 实时热销等，eliteId 与 jingfen 不同） */
+    fun materialRecommend(eliteId: Int, pageSize: Int, userKey: String? = null): List<AffiliateItem> {
+        val (userIdType, userId) = pseudoDeviceId(userKey)
+        val data = client.queryMaterialRecommend(eliteId, pageSize, userIdType, userId) ?: return emptyList()
+        return extractGoodsList(data).mapNotNull { mapGoodsNode(it, "") }
+    }
+
+    private fun pseudoDeviceId(userKey: String?): Pair<Int?, String?> {
+        val key = userKey?.takeIf { it.isNotBlank() } ?: return null to null
+        // 小程序无 idfa/imei，用 userKey 的 MD5 大写模拟 128 类型，提升千人千面命中率
+        val md5 = java.security.MessageDigest.getInstance("MD5")
+            .digest(key.toByteArray())
+            .joinToString("") { "%02X".format(it) }
+        return 128 to md5
+    }
+
     /**
      * 单品推广转链。京东规则：sceneId=1 仅支持 jingfen 联盟链；item.jd.com 须 sceneId=2（需联盟权限）。
      * sceneId=1 + item.jd.com 会落到活动推广页（如「又好又便宜」），非商品详情。

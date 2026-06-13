@@ -123,6 +123,16 @@ class VeapiProvider(
         Platform.PDD -> pddSearch(keyword, limit)
     }
 
+    override fun fetchEliteGoods(ctx: AffiliateContext, eliteId: Int, limit: Int): List<AffiliateItem> = when (ctx.platform) {
+        Platform.JD -> jdJingfen(eliteId, limit)
+        Platform.PDD -> pddRecommend(eliteId, limit, ctx)
+    }
+
+    override fun fetchMaterialRecommend(ctx: AffiliateContext, eliteId: Int, limit: Int): List<AffiliateItem> = when (ctx.platform) {
+        Platform.JD -> jdMaterialRecommend(eliteId, limit, ctx)
+        Platform.PDD -> pddRecommend(eliteId, limit, ctx)
+    }
+
     override fun buildCpsLink(ctx: AffiliateContext, itemId: String): String? = when (ctx.platform) {
         Platform.JD -> buildJdLink(ctx, itemId)
         Platform.PDD -> buildPddLink(ctx, itemId)
@@ -176,6 +186,56 @@ class VeapiProvider(
             if (items.isNotEmpty()) return items
         }
         return emptyList()
+    }
+
+    /**
+     * 京粉精选：维易 `/jd/jingfengoods`（等同官方 jingfen.query / goods.elite.get）。
+     * 文档亦称 elitegoods，故对 jingfengoods 无结果时尝试 `/jd/elitegoods`。
+     */
+    private fun jdJingfen(eliteId: Int, limit: Int): List<AffiliateItem> {
+        val params = mutableMapOf(
+            "eliteId" to eliteId.toString(),
+            "pageIndex" to "1",
+            "pageSize" to limit.coerceIn(1, 50).toString(),
+        )
+        veapi.jd.positionId.takeIf { it.contains('_') }?.let { params["pid"] = it }
+        for (path in listOf("/jd/jingfengoods", "/jd/elitegoods")) {
+            val data = client.get(path, params) ?: continue
+            val items = listNodes(data).mapNotNull { mapper.mapJdSearchGoods(it) }
+            if (items.isNotEmpty()) return items
+        }
+        return emptyList()
+    }
+
+    /**
+     * 千人千面物料推荐：维易 `/jd/jd_materialquery`（官方 goods.recommend.get）。
+     * 用户表亦称 `/jd/recommend`，故作为别名回退。eliteId：1猜你喜欢、2实时热销、3大额券、4=9.9包邮。
+     */
+    private fun jdMaterialRecommend(eliteId: Int, limit: Int, ctx: AffiliateContext): List<AffiliateItem> {
+        val params = mutableMapOf(
+            "eliteId" to eliteId.toString(),
+            "pageIndex" to "1",
+            "pageSize" to limit.coerceIn(1, 10).toString(),
+        )
+        veapi.jd.positionId.takeIf { it.contains('_') }?.let { params["pid"] = it }
+        pseudoDeviceId(ctx.userKey)?.let { (type, id) ->
+            params["userIdType"] = type.toString()
+            params["userId"] = id
+        }
+        for (path in listOf("/jd/jd_materialquery", "/jd/recommend")) {
+            val data = client.get(path, params) ?: continue
+            val items = listNodes(data).mapNotNull { mapper.mapJdSearchGoods(it) }
+            if (items.isNotEmpty()) return items
+        }
+        return emptyList()
+    }
+
+    private fun pseudoDeviceId(userKey: String?): Pair<Int, String>? {
+        val key = userKey?.takeIf { it.isNotBlank() } ?: return null
+        val md5 = java.security.MessageDigest.getInstance("MD5")
+            .digest(key.toByteArray())
+            .joinToString("") { "%02X".format(it) }
+        return 128 to md5
     }
 
     /**
@@ -256,6 +316,17 @@ class VeapiProvider(
         attachVeapiPddParams(params, ctx)
         val data = client.get("/pdd/pdd_goodssearch", params) ?: return null
         return listNodes(data).firstNotNullOfOrNull { mapper.mapPddGoods(it) }
+    }
+
+    /** 拼多多运营频道推荐（维易 `/pdd/pdd_recommend`，channel_type 对应 eliteId） */
+    private fun pddRecommend(channelType: Int, limit: Int, ctx: AffiliateContext): List<AffiliateItem> {
+        val params = mutableMapOf(
+            "channel_type" to channelType.toString(),
+            "limit" to limit.coerceIn(1, 50).toString(),
+        )
+        attachVeapiPddParams(params, ctx)
+        val data = client.get("/pdd/pdd_recommend", params) ?: return emptyList()
+        return listNodes(data).mapNotNull { mapper.mapPddGoods(it) }
     }
 
     private fun pddSearch(

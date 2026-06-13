@@ -58,6 +58,23 @@ class VeapiMapperTest {
     }
 
     @Test
+    fun `maps jd jingfen goods reusing search price waterfall`() {
+        val node = json.readTree(
+            """
+            {"skuId":"1000123","skuName":"京粉精选手机","owner":"g",
+             "priceInfo":{"price":1999,"lowestPrice":1899,"lowestCouponPrice":1799},
+             "imageInfo":{"imageList":[{"url":"//img.jd.com/x.jpg"}]},
+             "shopInfo":{"shopName":"京东自营旗舰店"}}
+            """.trimIndent(),
+        )
+        val item = mapper.mapJdSearchGoods(node)!!
+        assertEquals("1000123", item.platformItemId)
+        assertEquals("京粉精选手机", item.title)
+        assertTrue(item.rawPrice > BigDecimal.ZERO)
+        assertEquals("self", item.shopType)
+    }
+
+    @Test
     fun `mapping fails validation when title missing`() {
         val node = json.readTree("""{"skuId":"100","unitPrice":10}""")
         assertNull(mapper.mapJdPromotionGoods(node))

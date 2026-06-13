@@ -92,6 +92,26 @@ class JdUnionClient(
         return invoke("jd.union.open.goods.jingfen.query", mapOf("goodsReq" to req))
     }
 
+    /** 千人千面物料推荐（goods.recommend.get）：1猜你喜欢、2实时热销、3大额券、4=9.9包邮 */
+    fun queryMaterialRecommend(
+        eliteId: Int,
+        pageSize: Int = 10,
+        userIdType: Int? = null,
+        userId: String? = null,
+    ): JsonNode? {
+        val req = mutableMapOf<String, Any>(
+            "eliteId" to eliteId,
+            "pageIndex" to 1,
+            "pageSize" to pageSize.coerceIn(1, 10),
+        )
+        if (userIdType != null && !userId.isNullOrBlank()) {
+            req["userIdType"] = userIdType
+            req["userId"] = userId
+        }
+        if (jd.positionId.isNotBlank()) req["positionId"] = jd.positionId
+        return invoke("jd.union.open.goods.recommend.get", mapOf("goodsReq" to req))
+    }
+
     /** 关键词搜索（goods.search 接口，与 goods.query 不同） */
     fun searchGoods(keyword: String, pageSize: Int = 10): JsonNode? {
         val req = mapOf(

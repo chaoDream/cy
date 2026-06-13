@@ -1,7 +1,7 @@
 package com.zdsj.product
 
+import com.zdsj.affiliate.AffiliateItem
 import com.zdsj.affiliate.Platform
-import com.zdsj.affiliate.jd.JdUnionService
 import com.zdsj.affiliate.provider.AffiliateGateway
 import com.zdsj.common.ApiResponse
 import com.zdsj.rank.RankService
@@ -16,7 +16,6 @@ import java.util.concurrent.ConcurrentHashMap
 @Service
 class RecommendService(
     private val rankService: RankService,
-    private val jdUnionService: JdUnionService,
     private val gateway: AffiliateGateway,
     private val ingestService: ProductIngestService,
     private val imageStorage: ProductImageStorageService,
@@ -32,7 +31,12 @@ class RecommendService(
     private companion object {
         const val CACHE_TTL_MS = 30 * 60 * 1000L // 30 min
         val HOT_KEYWORDS = listOf("手机", "iPhone", "华为手机", "小米手机")
-        val JINGFEN_ELITE_IDS = listOf(22, 24) // 实时畅销榜, 数码电器
+        /** 京东 goods.recommend.get：1=猜你喜欢，2=实时热销（首页好物推荐主来源） */
+        val JD_MATERIAL_ELITE_IDS = listOf(1, 2)
+        /** 京东京粉精选（高佣补充）：22=实时畅销榜，24=数码家电 */
+        val JD_JINGFEN_ELITE_IDS = listOf(22, 24)
+        /** 拼多多 pdd_recommend：4=猜你喜欢，5=实时热销榜 */
+        val PDD_MATERIAL_CHANNEL_TYPES = listOf(4, 5)
     }
 
     fun recommend(): List<Map<String, Any?>> {
@@ -49,26 +53,12 @@ class RecommendService(
             if (seen.add(key)) result.add(item)
         }
 
-        // 2. JD Jingfen (curated high-commission products)
-        for (eliteId in JINGFEN_ELITE_IDS) {
-            val items = runCatching { jdUnionService.jingfen(eliteId, 10) }.getOrDefault(emptyList())
-            for (affiliate in items) {
-                val key = "${affiliate.platform}_${affiliate.platformItemId}"
-                if (!seen.add(key)) continue
-                val raw = runCatching { ingestService.upsert(affiliate) }.getOrNull() ?: continue
-                result.add(
-                    mapOf(
-                        "platform" to affiliate.platform,
-                        "platformItemId" to affiliate.platformItemId,
-                        "title" to affiliate.title,
-                        "imageUrl" to imageStorage.displayUrl(raw),
-                        "bestFinalPrice" to affiliate.rawPrice.takeIf { it > BigDecimal.ZERO },
-                        "shopName" to affiliate.shopName,
-                        "activityTags" to affiliate.activityTags,
-                    ),
-                )
-            }
-        }
+        // 2a. 千人千面 / 猜你喜欢（goods.recommend.get → 维易 jd_materialquery）
+        appendMaterialRecommend(Platform.JD, JD_MATERIAL_ELITE_IDS, seen, result)
+        appendMaterialRecommend(Platform.PDD, PDD_MATERIAL_CHANNEL_TYPES, seen, result)
+
+        // 2b. 京粉精选高佣补充（jingfen.query，与 recommend 的 eliteId 语义不同）
+        appendCurated(Platform.JD, JD_JINGFEN_ELITE_IDS, seen, result)
 
         // 3. Hot keyword search across platforms
         for (keyword in HOT_KEYWORDS) {
@@ -104,6 +94,57 @@ class RecommendService(
         cacheTime = now
         log.info("[recommend] refreshed: {} items (rank={}, total={})", final.size, rankItems.size, result.size)
         return final
+    }
+
+    private fun appendMaterialRecommend(
+        platform: Platform,
+        channelIds: List<Int>,
+        seen: MutableSet<String>,
+        result: MutableList<Map<String, Any?>>,
+    ) {
+        for (channelId in channelIds) {
+            val items = runCatching {
+                gateway.fetchMaterialRecommend(platform, channelId, 10).data ?: emptyList()
+            }.getOrDefault(emptyList())
+            appendAffiliateItems(items, seen, result)
+        }
+    }
+
+    private fun appendCurated(
+        platform: Platform,
+        channelIds: List<Int>,
+        seen: MutableSet<String>,
+        result: MutableList<Map<String, Any?>>,
+    ) {
+        for (channelId in channelIds) {
+            val items = runCatching {
+                gateway.fetchEliteGoods(platform, channelId, 10).data ?: emptyList()
+            }.getOrDefault(emptyList())
+            appendAffiliateItems(items, seen, result)
+        }
+    }
+
+    private fun appendAffiliateItems(
+        items: List<AffiliateItem>,
+        seen: MutableSet<String>,
+        result: MutableList<Map<String, Any?>>,
+    ) {
+        for (affiliate in items) {
+            val key = "${affiliate.platform}_${affiliate.platformItemId}"
+            if (!seen.add(key)) continue
+            val raw = runCatching { ingestService.upsert(affiliate) }.getOrNull() ?: continue
+            result.add(
+                mapOf(
+                    "platform" to affiliate.platform,
+                    "platformItemId" to affiliate.platformItemId,
+                    "title" to affiliate.title,
+                    "imageUrl" to imageStorage.displayUrl(raw),
+                    "bestFinalPrice" to affiliate.rawPrice.takeIf { it > BigDecimal.ZERO },
+                    "shopName" to affiliate.shopName,
+                    "activityTags" to affiliate.activityTags,
+                ),
+            )
+        }
     }
 }
 

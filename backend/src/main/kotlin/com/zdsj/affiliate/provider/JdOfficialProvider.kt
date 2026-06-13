@@ -45,6 +45,16 @@ class JdOfficialProvider(
         return jdUnionService.search(keyword, limit)
     }
 
+    override fun fetchEliteGoods(ctx: AffiliateContext, eliteId: Int, limit: Int): List<AffiliateItem> {
+        guardRate()
+        return jdUnionService.jingfen(eliteId, limit)
+    }
+
+    override fun fetchMaterialRecommend(ctx: AffiliateContext, eliteId: Int, limit: Int): List<AffiliateItem> {
+        guardRate()
+        return jdUnionService.materialRecommend(eliteId, limit, ctx.userKey)
+    }
+
     override fun buildCpsLink(ctx: AffiliateContext, itemId: String): String? =
         jdUnionService.buildCpsLink(itemId)
 

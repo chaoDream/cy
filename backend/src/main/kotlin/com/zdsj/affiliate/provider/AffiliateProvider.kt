@@ -64,5 +64,14 @@ interface AffiliateProvider {
 
     fun search(ctx: AffiliateContext, keyword: String, limit: Int = 10): List<AffiliateItem>
 
+    /** 京粉精选 / 运营频道（京东 jingfen eliteId 22/24…；拼多多 channel_type 5/1…），默认不支持 */
+    fun fetchEliteGoods(ctx: AffiliateContext, eliteId: Int, limit: Int = 20): List<AffiliateItem> = emptyList()
+
+    /**
+     * 千人千面物料推荐（京东 goods.recommend.get，eliteId=1猜你喜欢/2实时热销…；
+     * 拼多多 pdd_recommend channel_type=4猜你喜欢…），默认不支持。
+     */
+    fun fetchMaterialRecommend(ctx: AffiliateContext, eliteId: Int, limit: Int = 10): List<AffiliateItem> = emptyList()
+
     fun buildCpsLink(ctx: AffiliateContext, itemId: String): String?
 }

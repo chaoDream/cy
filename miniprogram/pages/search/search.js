@@ -1,12 +1,13 @@
 const api = require('../../api/index');
 const track = require('../../utils/track');
 const { detectFromClipboard } = require('../../utils/clipboard');
-const { resolveImageUrl } = require('../../utils/format');
+const { resolveImageUrl, platformName } = require('../../utils/format');
 const { prepareImageForDisplay, prepareListImages } = require('../../utils/image');
+const { compactModelName, recentDedupKey, dedupeRecentList } = require('../../utils/productTitle');
 
 const app = getApp();
 
-const RECENT_VISIBLE_COUNT = 6; // 首页最多展示2行（3列×2行）
+const RECENT_VISIBLE_COUNT = 8;
 const RECENT_STORAGE_LIMIT = 50;
 const RECENT_PAGE_SIZE = 12;
 const RECOMMEND_PAGE_SIZE = 6;
@@ -40,22 +41,37 @@ Page(track.mergePage({
   },
 
   /** 历史图存相对路径；展示时按当前 API 地址（真机/远程）重新拼完整 URL */
+  _decorateRecentItem(r) {
+    return {
+      ...r,
+      _imgErr: !!r._imgErr,
+      displayTitle: r.modelName || compactModelName(r.title),
+      platformText: platformName(r.platform),
+    };
+  },
+
+  _decorateRecentList(list) {
+    return (list || []).map((r) => this._decorateRecentItem(r));
+  },
+
   _loadRecent() {
     const raw = wx.getStorageSync('recentQueries') || [];
-    const normalized = raw.map((r) => ({
+    const normalized = dedupeRecentList(raw.map((r) => ({
       platform: r.platform,
       itemId: r.itemId,
       title: r.title,
+      modelName: r.modelName || compactModelName(r.title),
       imageUrl: this._toRelativeImage(r.imageUrl),
-    }));
+    })));
     if (normalized.length && JSON.stringify(normalized) !== JSON.stringify(raw)) {
       wx.setStorageSync('recentQueries', normalized);
     }
     prepareListImages(
       normalized.map((r) => ({ ...r, _imgErr: false })),
     ).then((recent) => {
-      const recentVisible = recent.slice(0, RECENT_VISIBLE_COUNT);
-      this.setData({ recent, recentVisible, recentHasMore: recent.length > RECENT_VISIBLE_COUNT });
+      const decorated = this._decorateRecentList(recent);
+      const recentVisible = decorated.slice(0, RECENT_VISIBLE_COUNT);
+      this.setData({ recent: decorated, recentVisible, recentHasMore: decorated.length > RECENT_VISIBLE_COUNT });
     });
   },
 
@@ -121,7 +137,7 @@ Page(track.mergePage({
     const all = this.data.recent;
     const start = 0;
     const end = page * RECENT_PAGE_SIZE;
-    const pageItems = all.slice(start, end);
+    const pageItems = this._decorateRecentList(all.slice(start, end));
     this.setData({
       recentPopupList: pageItems,
       recentPopupPage: page,
@@ -133,6 +149,7 @@ Page(track.mergePage({
   onRecentPopupTap(e) {
     const { platform, itemid } = e.currentTarget.dataset;
     this.setData({ showRecentPopup: false });
+    this._bumpRecent(platform, itemid);
     this._gotoAnalysis(platform, itemid);
   },
 
@@ -154,9 +171,16 @@ Page(track.mergePage({
   },
 
   onRecentImgError(e) {
-    const idx = e.currentTarget.dataset.index;
-    if (idx === undefined || idx === null) return;
-    this.setData({ [`recent[${idx}]._imgErr`]: true });
+    const { platform, itemid } = e.currentTarget.dataset;
+    if (!platform || !itemid) return;
+    const markErr = (list) => list.map((r) => (
+      r.platform === platform && r.itemId === itemid ? { ...r, _imgErr: true } : r
+    ));
+    this.setData({
+      recent: markErr(this.data.recent),
+      recentVisible: markErr(this.data.recentVisible),
+      recentPopupList: markErr(this.data.recentPopupList),
+    });
   },
 
   onShow() {
@@ -237,11 +261,17 @@ Page(track.mergePage({
   onCardTap(e) {
     const item = e.detail;
     if (!item || !item.platform || !item.itemId) return;
+    this._saveRecent({
+      platform: item.platform,
+      itemId: item.itemId,
+      productInfo: { title: item.title, imageUrl: item.imageUrl },
+    });
     this._gotoAnalysis(item.platform, item.itemId);
   },
 
   onRecentTap(e) {
     const { platform, itemid } = e.currentTarget.dataset;
+    this._bumpRecent(platform, itemid);
     this._gotoAnalysis(platform, itemid);
   },
 
@@ -251,23 +281,43 @@ Page(track.mergePage({
     });
   },
 
+  _bumpRecent(platform, itemId) {
+    const raw = wx.getStorageSync('recentQueries') || [];
+    const idx = raw.findIndex(
+      (r) => r.platform === platform && String(r.itemId) === String(itemId),
+    );
+    if (idx <= 0) return;
+    const next = [raw[idx], ...raw.slice(0, idx), ...raw.slice(idx + 1)];
+    wx.setStorageSync('recentQueries', next);
+    prepareListImages(next.map((r) => ({ ...r, _imgErr: false }))).then((recent) => {
+      const decorated = this._decorateRecentList(recent);
+      const recentVisible = decorated.slice(0, RECENT_VISIBLE_COUNT);
+      this.setData({ recent: decorated, recentVisible, recentHasMore: decorated.length > RECENT_VISIBLE_COUNT });
+    });
+  },
+
   _saveRecent(res) {
     // 存相对路径，渲染时再按当前环境 resolveImageUrl；
     // 不能把绝对地址写进 storage——切换 devtools/真机/远程后旧 host 不可达，图就裂了
-    const stored = (wx.getStorageSync('recentQueries') || []).filter(
-      (r) => !(r.platform === res.platform && r.itemId === res.itemId),
-    );
-    stored.unshift({
+    const modelName = compactModelName(res.productInfo.title);
+    const newEntry = {
       platform: res.platform,
       itemId: res.itemId,
       title: res.productInfo.title,
+      modelName,
       imageUrl: res.productInfo.imageUrl,
-    });
+    };
+    const dedupKey = recentDedupKey(newEntry);
+    const stored = (wx.getStorageSync('recentQueries') || []).filter(
+      (r) => recentDedupKey(r) !== dedupKey,
+    );
+    stored.unshift(newEntry);
     const next = stored.slice(0, RECENT_STORAGE_LIMIT);
     wx.setStorageSync('recentQueries', next);
     prepareListImages(next.map((r) => ({ ...r, _imgErr: false }))).then((recent) => {
-      const recentVisible = recent.slice(0, RECENT_VISIBLE_COUNT);
-      this.setData({ recent, recentVisible, recentHasMore: recent.length > RECENT_VISIBLE_COUNT });
+      const decorated = this._decorateRecentList(recent);
+      const recentVisible = decorated.slice(0, RECENT_VISIBLE_COUNT);
+      this.setData({ recent: decorated, recentVisible, recentHasMore: decorated.length > RECENT_VISIBLE_COUNT });
     });
   },
 }, track.pageMixin('search')));
