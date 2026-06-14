@@ -12,4 +12,7 @@ class AdminPageController {
 
     @GetMapping("/admin", "/admin/")
     fun dashboard(): String = "forward:/admin/index.html"
+
+    @GetMapping("/admin/feedback")
+    fun feedback(): String = "forward:/admin/feedback.html"
 }

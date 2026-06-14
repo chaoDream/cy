@@ -1,5 +1,5 @@
 {
-  "navigationBarTitleText": "真到手价",
+  "navigationBarTitleText": "省心买",
   "usingComponents": {
     "asset-library": "/components/asset-library/asset-library",
     "product-card": "/components/product-card/product-card"

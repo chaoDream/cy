@@ -68,11 +68,19 @@
     .hour-labels span { flex: 1; text-align: center; font-size: 10px; color: var(--muted); min-width: 6px; }
     select.days-select { border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px;
       font-size: 13px; background: var(--card); margin-left: 8px; }
+    nav { display: flex; gap: 8px; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 13px; padding: 6px 12px; border-radius: 6px; }
+    nav a:hover { background: #f1f3f4; color: var(--text); }
+    nav a.on { background: #e8f0fe; color: var(--blue); font-weight: 600; }
   </style>
 </head>
 <body>
   <header>
     <h1>真到手价 · 数据总览</h1>
+    <nav>
+      <a href="/admin/" class="on">数据总览</a>
+      <a href="/admin/feedback">用户反馈</a>
+    </nav>
     <span class="meta" id="genAt">加载中…</span>
     <button id="refreshBtn" onclick="loadAll()">刷新</button>
   </header>

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>真到手价 · 用户反馈</title>
+  <style>
+    :root {
+      --bg: #f5f6f8; --card: #fff; --line: #e8eaed; --text: #202124;
+      --muted: #5f6368; --blue: #1a73e8; --green: #1e8e3e; --red: #d93025;
+      --amber: #f29900;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text);
+      font: 14px/1.5 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+    header { background: var(--card); border-bottom: 1px solid var(--line);
+      padding: 16px 24px; display: flex; align-items: center; gap: 16px; position: sticky; top: 0; z-index: 10; }
+    header h1 { font-size: 18px; margin: 0; flex: 1; }
+    header .meta { color: var(--muted); font-size: 12px; }
+    nav { display: flex; gap: 8px; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 13px; padding: 6px 12px; border-radius: 6px; }
+    nav a:hover { background: #f1f3f4; color: var(--text); }
+    nav a.on { background: #e8f0fe; color: var(--blue); font-weight: 600; }
+    button { background: var(--blue); color: #fff; border: 0; border-radius: 6px;
+      padding: 8px 16px; font-size: 13px; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: default; }
+    button.ghost { background: transparent; color: var(--blue); border: 1px solid var(--line); }
+    button.sm { padding: 4px 10px; font-size: 12px; }
+    main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+    .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+    .toolbar select { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px;
+      font-size: 13px; background: var(--card); }
+    .pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .pill.open { background: #fef7e0; color: var(--amber); }
+    .pill.resolved { background: #e6f4ea; color: var(--green); }
+    table { width: 100%; border-collapse: collapse; background: var(--card);
+      border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; white-space: nowrap; }
+    tr:last-child td { border-bottom: 0; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .content { max-width: 280px; word-break: break-word; color: var(--text); }
+    .product-cell { min-width: 280px; max-width: 360px; }
+    .product-title { font-weight: 600; line-height: 1.4; margin-bottom: 4px; }
+    .product-sku { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+    .product-price { margin-bottom: 6px; }
+    .product-price .final { color: var(--red); font-weight: 700; font-size: 15px; }
+    .product-price .display { color: var(--muted); font-size: 12px; margin-left: 6px; }
+    .product-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+    .pill.shop-self { background: #fce8e6; color: var(--red); }
+    .pill.shop-flagship { background: #e8f0fe; color: var(--blue); }
+    .pill.shop-third { background: #fef7e0; color: var(--amber); }
+    .product-links { display: flex; flex-wrap: wrap; gap: 8px; }
+    .product-links a { color: var(--blue); text-decoration: none; font-size: 12px; }
+    .product-links a:hover { text-decoration: underline; }
+    .muted { color: var(--muted); font-size: 12px; }
+    .tag { font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #f1f3f4;
+      padding: 1px 6px; border-radius: 4px; }
+    .err { color: var(--red); }
+    .pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 16px; }
+    .empty { text-align: center; padding: 48px; color: var(--muted); background: var(--card);
+      border: 1px solid var(--line); border-radius: 10px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>真到手价 · 用户反馈</h1>
+    <nav>
+      <a href="/admin/">数据总览</a>
+      <a href="/admin/feedback" class="on">用户反馈</a>
+    </nav>
+    <span class="meta" id="summary">加载中…</span>
+    <button id="refreshBtn" onclick="loadList()">刷新</button>
+  </header>
+  <main>
+    <div class="toolbar">
+      <label class="muted">状态筛选</label>
+      <select id="statusFilter" onchange="onFilterChange()">
+        <option value="">全部</option>
+        <option value="open">待处理</option>
+        <option value="resolved">已处理</option>
+      </select>
+    </div>
+    <div id="tableWrap"><p class="muted">正在加载…</p></div>
+    <div class="pager" id="pager" style="display:none">
+      <button class="ghost sm" id="prevBtn" onclick="prevPage()">上一页</button>
+      <span class="muted" id="pageInfo"></span>
+      <button class="ghost sm" id="nextBtn" onclick="nextPage()">下一页</button>
+    </div>
+  </main>
+
+  <script>
+    let page = 1;
+    const size = 20;
+    let total = 0;
+    let statusFilter = '';
+
+    function fmtTime(s) {
+      if (!s) return '—';
+      return new Date(s).toLocaleString('zh-CN');
+    }
+
+    function esc(s) {
+      if (s == null || s === '') return '—';
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function fmtPrice(v) {
+      if (v == null || v === '') return null;
+      const n = Number(v);
+      if (Number.isNaN(n)) return null;
+      return String(parseFloat(n.toFixed(2)));
+    }
+
+    function shopPillClass(shopType) {
+      if (shopType === 'self') return 'shop-self';
+      if (shopType === 'flagship') return 'shop-flagship';
+      if (shopType === 'thirdparty') return 'shop-third';
+      return 'muted';
+    }
+
+    function resolveAnalysisUrl(path) {
+      if (!path) return null;
+      if (location.port === '8080') {
+        return location.protocol + '//' + location.hostname + ':5173' + path;
+      }
+      return location.origin + path;
+    }
+
+    function renderProductCell(item) {
+      const p = item.product;
+      if (!p || (!p.title && !item.rawProductId)) {
+        return '<span class="muted">' +
+          (item.rawProductId ? '商品 #' + esc(item.rawProductId) + '（详情缺失）' : '未关联商品') +
+          '</span>';
+      }
+
+      const title = esc(p.title || '—');
+      const standardName = p.standardName ? esc(p.standardName) : '';
+      const modelLine = !standardName && (p.brand || p.model)
+        ? esc([p.brand, p.model, p.storage].filter(Boolean).join(' '))
+        : '';
+
+      const finalPrice = fmtPrice(p.finalPrice);
+      const displayPrice = fmtPrice(p.displayPrice);
+      let priceHtml = '<div class="product-price">';
+      if (finalPrice) {
+        priceHtml += '<span class="final">到手价 ¥' + finalPrice + '</span>';
+        if (displayPrice && displayPrice !== finalPrice) {
+          priceHtml += '<span class="display">挂牌 ¥' + displayPrice + '</span>';
+        }
+      } else if (displayPrice) {
+        priceHtml += '<span class="final">参考价 ¥' + displayPrice + '</span>';
+      } else {
+        priceHtml += '<span class="muted">价格未知</span>';
+      }
+      priceHtml += '</div>';
+
+      const platformLabel = esc(p.platformLabel || p.platform || '');
+      const shopLabel = esc(p.shopTypeLabel || '');
+      const shopName = p.shopName ? esc(p.shopName) : '';
+      let metaHtml = '<div class="product-meta">';
+      if (platformLabel && platformLabel !== '—') {
+        metaHtml += '<span class="tag">' + platformLabel + '</span>';
+      }
+      if (shopLabel && shopLabel !== '—') {
+        metaHtml += '<span class="pill ' + shopPillClass(p.shopType) + '">' + shopLabel + '</span>';
+      }
+      if (shopName && shopName !== '—') {
+        metaHtml += '<span class="muted">' + shopName + '</span>';
+      }
+      metaHtml += '</div>';
+
+      const links = p.links || {};
+      let linksHtml = '<div class="product-links">';
+      if (links.analysisPath) {
+        const analysisUrl = resolveAnalysisUrl(links.analysisPath);
+        linksHtml += '<a href="' + esc(analysisUrl) + '" target="_blank" rel="noopener">查看分析</a>';
+      }
+      if (links.platformUrl) {
+        linksHtml += '<a href="' + esc(links.platformUrl) + '" target="_blank" rel="noopener">平台商品</a>';
+      }
+      if (links.sourceUrl && links.sourceUrl !== links.platformUrl) {
+        linksHtml += '<a href="' + esc(links.sourceUrl) + '" target="_blank" rel="noopener">原始链接</a>';
+      }
+      if (linksHtml === '<div class="product-links">') {
+        linksHtml += '<span class="muted">无跳转链接</span>';
+      }
+      linksHtml += '</div>';
+
+      return '<div class="product-cell">' +
+        '<div class="product-title">' + title + '</div>' +
+        (standardName ? '<div class="product-sku">标准型号：' + standardName + '</div>' : '') +
+        (modelLine ? '<div class="product-sku">' + modelLine + '</div>' : '') +
+        priceHtml + metaHtml + linksHtml +
+        '</div>';
+    }
+
+    function onFilterChange() {
+      statusFilter = document.getElementById('statusFilter').value;
+      page = 1;
+      loadList();
+    }
+
+    function prevPage() {
+      if (page > 1) { page--; loadList(); }
+    }
+
+    function nextPage() {
+      const maxPage = Math.ceil(total / size);
+      if (page < maxPage) { page++; loadList(); }
+    }
+
+    async function loadList() {
+      const btn = document.getElementById('refreshBtn');
+      btn.disabled = true; btn.textContent = '刷新中…';
+      try {
+        const qs = new URLSearchParams({ page: String(page), size: String(size) });
+        if (statusFilter) qs.set('status', statusFilter);
+        const res = await fetch('/api/admin/feedback/list?' + qs, { headers: { 'Accept': 'application/json' } });
+        const json = await res.json();
+        if (json.code !== 0) throw new Error(json.message || ('code ' + json.code));
+        render(json.data);
+      } catch (e) {
+        document.getElementById('tableWrap').innerHTML =
+          '<p class="err">加载失败：' + esc(e.message || e) + '</p>';
+        document.getElementById('pager').style.display = 'none';
+      } finally {
+        btn.disabled = false; btn.textContent = '刷新';
+      }
+    }
+
+    function render(data) {
+      total = data.total || 0;
+      const openCount = data.openCount || 0;
+      document.getElementById('summary').textContent =
+        '待处理 ' + openCount + ' 条 · 共 ' + total + ' 条';
+
+      const items = data.items || [];
+      const wrap = document.getElementById('tableWrap');
+      if (!items.length) {
+        wrap.innerHTML = '<div class="empty">暂无反馈记录</div>';
+        document.getElementById('pager').style.display = 'none';
+        return;
+      }
+
+      let html = '<table><thead><tr>' +
+        '<th>ID</th><th>时间</th><th>类型</th><th>内容</th><th>关联商品</th><th>用户</th><th>状态</th><th>操作</th>' +
+        '</tr></thead><tbody>';
+
+      items.forEach(item => {
+        const isOpen = item.status === 'open';
+        const actionBtn = isOpen
+          ? '<button class="sm" onclick="markResolved(' + item.id + ')">标记已处理</button>'
+          : '<button class="ghost sm" onclick="markOpen(' + item.id + ')">重新打开</button>';
+
+        html += '<tr>' +
+          '<td class="num">#' + esc(item.id) + '</td>' +
+          '<td class="muted">' + fmtTime(item.createdAt) + '</td>' +
+          '<td>' + esc(item.feedbackTypeLabel) + '</td>' +
+          '<td class="content">' + esc(item.feedbackContent) + '</td>' +
+          '<td>' + renderProductCell(item) + '</td>' +
+          '<td class="muted">' + (item.userId ? '#' + esc(item.userId) : '—') + '</td>' +
+          '<td><span class="pill ' + esc(item.status) + '">' + (isOpen ? '待处理' : '已处理') + '</span></td>' +
+          '<td>' + actionBtn + '</td>' +
+          '</tr>';
+      });
+      html += '</tbody></table>';
+      wrap.innerHTML = html;
+
+      const maxPage = Math.max(1, Math.ceil(total / size));
+      document.getElementById('pager').style.display = maxPage > 1 ? 'flex' : 'none';
+      document.getElementById('pageInfo').textContent = '第 ' + page + ' / ' + maxPage + ' 页';
+      document.getElementById('prevBtn').disabled = page <= 1;
+      document.getElementById('nextBtn').disabled = page >= maxPage;
+    }
+
+    async function updateStatus(feedbackId, status) {
+      try {
+        const res = await fetch('/api/admin/feedback/status', {
+          method: 'POST',
+          headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ feedbackId, status }),
+        });
+        const json = await res.json();
+        if (json.code !== 0) throw new Error(json.message || ('code ' + json.code));
+        loadList();
+      } catch (e) {
+        alert('操作失败：' + (e.message || e));
+      }
+    }
+
+    function markResolved(id) { updateStatus(id, 'resolved'); }
+    function markOpen(id) { updateStatus(id, 'open'); }
+
+    loadList();
+  </script>
+</body>
+</html>
