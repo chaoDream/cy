@@ -21,6 +21,15 @@ if [[ "${NGINX_CONF:-./nginx/default.http-only.conf}" == *"default.conf"* ]]; th
   fi
 fi
 
+# ---------- 构建 Web 前端 ----------
+WEB_DIR="$ROOT/../web"
+if [[ -f "$WEB_DIR/package.json" ]]; then
+  echo ">>> 构建 Web 前端..."
+  "$ROOT/scripts/build-web.sh"
+else
+  echo ">>> 跳过 Web 构建（未找到 web/package.json）"
+fi
+
 echo ">>> 构建并启动服务..."
 docker compose -f docker-compose.prod.yml up -d --build
 
@@ -36,8 +45,10 @@ fi
 echo ""
 echo "部署完成。对外访问："
 if [[ "${NGINX_CONF:-}" == *"http-only"* ]]; then
-  echo "  http://<服务器公网IP>/api/health"
+  echo "  Web:  http://<服务器公网IP>/"
+  echo "  API:  http://<服务器公网IP>/api/health"
   echo "  （小程序上线前请配置 SSL 并改 NGINX_CONF=./nginx/default.conf）"
 else
-  echo "  https://<你的域名>/api/health"
+  echo "  Web:  https://<你的域名>/"
+  echo "  API:  https://<你的域名>/api/health"
 fi

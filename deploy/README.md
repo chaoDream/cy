@@ -2,6 +2,8 @@
 
 一台 CVM 上运行 **Nginx + Spring Boot + PostgreSQL + Redis**，与本地 `docker-compose.yml` 架构一致，但生产环境不对公网暴露 5432/6379/8080。
 
+Nginx 同时托管 **Web 前端**（`web/dist/`）和 **API 反向代理**，同源部署，无 CORS 问题。
+
 > **文档维护约定**：凡改动 `deploy/` 下部署脚本、`.env.example`、`docker-compose.prod.yml`、密钥同步流程、发版命令或运维步骤，**须同步更新本 README**（必要时一并更新 `deploy/.env.example` 顶部注释）。避免「代码/脚本已变、文档仍写旧流程」。
 
 ---
@@ -204,17 +206,60 @@ docker compose -f docker-compose.prod.yml exec backend wget -qO- http://127.0.0.
 
 | 脚本 | 作用 |
 |------|------|
-| `scripts/deploy.sh` | 服务器上拉镜像/构建并启动 compose |
+| `scripts/deploy.sh` | 服务器上构建 Web 前端 + 拉镜像/构建后端并启动 compose |
 | `scripts/push-deploy.sh` | 本机 SSH 远程 `git pull` + `deploy.sh`；支持 `--push`、`--sync-env` |
+| `scripts/build-web.sh` | 构建 Web 前端到 `web/dist/`（`deploy.sh` 内部自动调用） |
 | `scripts/sync-env-from-local.sh` | 从 `application-local.yml` 同步密钥到 `deploy/.env`；`--remote` 同步到 CVM |
 | `scripts/backup-db.sh` | PostgreSQL 备份 |
 | `scripts/init-tencent-cloud.sh` | 新 CVM 安装 Docker 等 |
 
 ---
 
+## Web 前端
+
+Web 前端代码位于 `web/` 目录，基于 Vue 3 + Vite + Element Plus。
+
+### 本地开发
+
+```bash
+cd web
+npm install
+npm run dev    # http://localhost:5173，自动代理 /api 到 localhost:8080
+```
+
+### 生产构建
+
+`deploy.sh` 会在启动容器前自动执行 `build-web.sh`，将 `web/dist/` 构建好后挂载到 Nginx 容器的 `/var/www/web`。
+
+也可以手动构建：
+
+```bash
+cd deploy
+./scripts/build-web.sh
+```
+
+### 部署架构
+
+```
+浏览器 → Nginx:80/443
+              ├─ /api/*         → backend:8080（Spring Boot）
+              ├─ /static/*      → 头像/商品图（Docker 卷）
+              └─ /*             → web/dist/（SPA，try_files → index.html）
+```
+
+服务器需安装 Node.js 16+（构建 Web 前端用）。可通过 `init-tencent-cloud.sh` 自动安装，或手动：
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+```
+
+---
+
 ## 注意事项
 
 - **构建内存**：`docker compose build` 会在容器内跑 Gradle，CVM 建议 ≥4G 内存；若 OOM，可在本地 `./gradlew bootJar` 后改用预构建镜像。
+- **Node.js**：服务器需安装 Node.js 16+ 用于构建 Web 前端（`npm ci && vite build`）。
 - **密钥**：`.env`、`deploy.local.env`、`certs/`、`backend/application-local.yml`、`backend/price-seeds.yml` 均勿提交仓库。
 - **改密钥后**：本地跑 `sync-env-from-local.sh --remote`，再 `up -d --force-recreate backend`（或 `push-deploy.sh --sync-env` 一并完成）。
 - **用户头像**：登录时下载到 Docker 卷 `avatar_data`，Nginx 路径 `/static/avatars/` 静态托管。

@@ -15,8 +15,8 @@ const FORCE_ENV = LOCAL_DEBUG ? 'dev' : '';
 // 改这一行即可默认连本地或远程：'local' | 'remote'
 const DEFAULT_API_TARGET = 'local';
 
-// 远程服务器（Nginx 80 端口，勿加 :8080）
-const REMOTE_BASE_URL = 'http://62.234.81.122';
+// 远程服务器（走域名，需在小程序后台配置 request 合法域名）
+const REMOTE_BASE_URL = 'https://api.zhendaoshoujia.com';
 
 // 真机联调本地后端：填开发机局域网 IP（换 Wi-Fi 后若连不上先更新此项）
 const DEV_LAN_IP = '192.168.0.107';

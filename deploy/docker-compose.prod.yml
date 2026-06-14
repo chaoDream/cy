@@ -113,6 +113,7 @@ services:
       - ./certs:/etc/nginx/certs:ro
       - avatar_data:/data/avatars:ro
       - product_image_data:/data/product-images:ro
+      - ../web/dist:/var/www/web:ro
     networks:
       - internal
 
