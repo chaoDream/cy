@@ -13,6 +13,7 @@ import com.zdsj.product.ProductSkuRepository
 import com.zdsj.user.AppUserRepository
 import com.zdsj.user.UserService
 import org.slf4j.LoggerFactory
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
@@ -28,6 +29,7 @@ import java.time.OffsetDateTime
  * 命中目标价 → 记录快照 + 写 alert_hit_record + 下发订阅消息。
  */
 @Component
+@ConditionalOnProperty(prefix = "zdsj.watch", name = ["enabled"], havingValue = "true", matchIfMissing = true)
 class WatchPollingJob(
     private val watchRepo: WatchItemRepository,
     private val hitRepo: AlertHitRecordRepository,

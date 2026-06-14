@@ -147,6 +147,7 @@ data class AiProperties(
 
 @ConfigurationProperties(prefix = "zdsj.watch")
 data class WatchProperties(
+    val enabled: Boolean = true,
     val pollHotCron: String = "0 0 */2 * * ?",
     val pollUserCron: String = "0 30 */4 * * ?",
     val pollNormalCron: String = "0 0 4 * * ?",

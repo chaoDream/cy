@@ -16,7 +16,7 @@ const FORCE_ENV = LOCAL_DEBUG ? 'dev' : '';
 const DEFAULT_API_TARGET = 'local';
 
 // 远程服务器（走域名，需在小程序后台配置 request 合法域名）
-const REMOTE_BASE_URL = 'https://api.zhendaoshoujia.com';
+const REMOTE_BASE_URL = 'https://api.aisuanjia.com';
 
 // 真机联调本地后端：填开发机局域网 IP（换 Wi-Fi 后若连不上先更新此项）
 const DEV_LAN_IP = '192.168.0.107';
@@ -59,11 +59,11 @@ const CONFIG = {
     subscribeTemplateId: 'dev_template_id',
   },
   test: {
-    baseUrl: 'https://test-api.zhendaoshoujia.com',
+    baseUrl: 'https://test-api.aisuanjia.com',
     subscribeTemplateId: 'test_template_id',
   },
   prod: {
-    baseUrl: 'https://api.zhendaoshoujia.com',
+    baseUrl: 'https://api.aisuanjia.com',
     subscribeTemplateId: 'prod_template_id',
   },
 };

@@ -1,6 +1,6 @@
 # 真到手价 · AI 购物决策助手（MVP）
 
-> 站在用户这边、会算「个人专属到手价」、能主动盯价、帮你做购买决定、还帮你避开打折陷阱的 AI 购物决策助手。首发手机/3C 数码，微信小程序。
+> 站在用户这边、会算「个人专属到手价」、能主动盯价、帮你做购买决定、还帮你避开打折陷阱的 AI 购物决策助手。首发手机/3C 数码，微信小程序 + PC Web 端。
 
 完整需求见 [cc_PRD.md](cc_PRD.md)。
 
@@ -11,14 +11,17 @@ shengxin-buy/
 ├── cc_PRD.md            # 产品需求文档（冻结）
 ├── docker-compose.yml   # 本地 PostgreSQL + Redis
 ├── backend/             # Spring Boot 3 (Kotlin) 模块化单体
-└── miniprogram/         # 微信小程序原生工程
+├── miniprogram/         # 微信小程序原生工程
+├── web/                 # PC Web 端（Vue 3 + Vite + Element Plus）
+└── deploy/              # 单机 Docker 部署（Nginx + 后端 + DB）
 ```
 
 ## 技术栈
 
 | 层 | 选型 |
 |---|---|
-| 前端 | 微信小程序原生（WXML/WXSS/JS + 自定义组件） |
+| 前端（小程序） | 微信小程序原生（WXML/WXSS/JS + 自定义组件） |
+| 前端（Web） | Vue 3 + Vite + TypeScript + Element Plus + ECharts |
 | 后端 | Kotlin + Spring Boot 3，模块化单体（按服务边界分包） |
 | 数据库 | PostgreSQL（业务 + 价格快照）+ Redis（缓存/限流） |
 | 定时任务 | Quartz（漏斗轮询盯价） |
@@ -42,6 +45,18 @@ cd backend
 # 健康检查
 curl http://localhost:8080/api/health
 ```
+
+## 快速开始（Web 端）
+
+```bash
+# 1. 确保后端已启动（localhost:8080）
+# 2. 启动 Web 开发服务器
+cd web
+npm install
+npm run dev         # http://localhost:5173
+```
+
+详细说明见 [web/README.md](web/README.md)。
 
 ## 快速开始（小程序）
 
