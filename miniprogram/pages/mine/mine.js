@@ -3,6 +3,7 @@ const track = require('../../utils/track');
 const { getUserInfo, restoreLogin } = require('../../utils/auth');
 const { getToken } = require('../../utils/request');
 const { resolveImageUrl } = require('../../utils/format');
+const { getShareMessage, getShareTimeline } = require('../../utils/share');
 
 const app = getApp();
 
@@ -95,5 +96,13 @@ Page(track.mergePage({
 
   goFeedback() {
     wx.navigateTo({ url: '/packageA/pages/data-notice/data-notice?mode=feedback' });
+  },
+
+  onShareAppMessage() {
+    return getShareMessage('mine');
+  },
+
+  onShareTimeline() {
+    return getShareTimeline('mine');
   },
 }, track.pageMixin('mine')));

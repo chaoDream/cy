@@ -3,6 +3,7 @@ const track = require('../../../utils/track');
 const { ensureLogin, getUserId } = require('../../../utils/auth');
 const { subscribeTemplateId } = require('../../../utils/config');
 const { platformName, shopTypeName, yuan, yuanTrim } = require('../../../utils/format');
+const { getAnalysisShareMessage, getAnalysisShareTimeline } = require('../../../utils/share');
 
 /** 价格输入清洗：仅留数字与一个小数点，最多两位小数 */
 function sanitizeMoney(v) {
@@ -641,9 +642,12 @@ Page(track.mergePage({
   onShareAppMessage() {
     track.event('share_card_click');
     const d = this.data.data;
-    return {
-      title: `${d.productInfo.title} 真实到手价 ¥${yuan(d.priceInfo.estimatedFinalPrice)}`,
-      path: `/packageA/pages/analysis/analysis?platform=${this.data.platform}&itemId=${this.data.itemId}`,
-    };
+    return getAnalysisShareMessage(d.productInfo.title, yuan(d.priceInfo.estimatedFinalPrice), this.data.platform, this.data.itemId);
+  },
+
+  onShareTimeline() {
+    track.event('share_timeline_click');
+    const d = this.data.data;
+    return getAnalysisShareTimeline(d.productInfo.title, yuan(d.priceInfo.estimatedFinalPrice), this.data.platform, this.data.itemId);
   },
 }, track.pageMixin('analysis')));

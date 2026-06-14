@@ -4,6 +4,7 @@ const { detectFromClipboard } = require('../../utils/clipboard');
 const { resolveImageUrl, platformName } = require('../../utils/format');
 const { prepareImageForDisplay, prepareListImages } = require('../../utils/image');
 const { compactModelName, recentDedupKey, dedupeRecentList } = require('../../utils/productTitle');
+const { getShareMessage, getShareTimeline } = require('../../utils/share');
 
 const app = getApp();
 
@@ -319,5 +320,13 @@ Page(track.mergePage({
       const recentVisible = decorated.slice(0, RECENT_VISIBLE_COUNT);
       this.setData({ recent: decorated, recentVisible, recentHasMore: decorated.length > RECENT_VISIBLE_COUNT });
     });
+  },
+
+  onShareAppMessage() {
+    return getShareMessage('search');
+  },
+
+  onShareTimeline() {
+    return getShareTimeline('search');
   },
 }, track.pageMixin('search')));

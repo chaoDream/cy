@@ -3,6 +3,7 @@ const track = require('../../utils/track');
 const { ensureLogin } = require('../../utils/auth');
 const { yuanTrim } = require('../../utils/format');
 const { prepareListImages } = require('../../utils/image');
+const { getShareMessage, getShareTimeline } = require('../../utils/share');
 
 Page(track.mergePage({
   data: {
@@ -140,5 +141,13 @@ Page(track.mergePage({
     if (platform && itemid) {
       wx.navigateTo({ url: `/packageA/pages/analysis/analysis?platform=${platform}&itemId=${itemid}` });
     }
+  },
+
+  onShareAppMessage() {
+    return getShareMessage('watch');
+  },
+
+  onShareTimeline() {
+    return getShareTimeline('watch');
   },
 }, track.pageMixin('watch')));

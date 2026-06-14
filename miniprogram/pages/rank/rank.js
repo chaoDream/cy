@@ -1,5 +1,6 @@
 const api = require('../../api/index');
 const track = require('../../utils/track');
+const { getShareMessage, getShareTimeline } = require('../../utils/share');
 
 Page(track.mergePage({
   data: {
@@ -38,5 +39,13 @@ Page(track.mergePage({
     wx.navigateTo({
       url: `/packageA/pages/analysis/analysis?platform=${item.platform}&itemId=${item.platformItemId}`,
     });
+  },
+
+  onShareAppMessage() {
+    return getShareMessage('rank');
+  },
+
+  onShareTimeline() {
+    return getShareTimeline('rank');
   },
 }, track.pageMixin('rank')));
